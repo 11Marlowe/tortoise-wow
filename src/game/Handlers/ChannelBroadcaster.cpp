@@ -85,6 +85,12 @@ void ChannelBroadcaster::ThreadProc()
 				TargetChannel->Say(ChanMsg.PlayerGuid, ChanMsg.Message.c_str(), ChanMsg.Language, ChanMsg.bSkipChecks);
 				MessageIterator++;
 			}
+
+			// Nothing queued: back off briefly instead of spinning a core for the whole
+			// map update. 100us keeps chat latency and the DisableSendingMessages()
+			// handshake far below a world tick.
+			if (MessageIterator == 0)
+				std::this_thread::sleep_for(std::chrono::microseconds(100));
 		}
 		bIsWorking.store(false);
 
