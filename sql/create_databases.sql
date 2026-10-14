@@ -8300,6 +8300,20 @@ CREATE TABLE `player_census` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `playable_class`
+--
+
+DROP TABLE IF EXISTS `playable_class`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `playable_class` (
+  `id` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `comment` varchar(255) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `player_classlevelstats`
 --
 

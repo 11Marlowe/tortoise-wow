@@ -29,6 +29,7 @@
 #include "CreatureGroups.h"
 #include "Group.h"
 #include "ScriptObjects.h"
+#include "ClassRegistry.h"
 
 char const* conditionSourceToStr[] =
         {
@@ -1027,7 +1028,7 @@ bool ConditionEntry::IsValid()
                 return false;
             }
 
-            if (m_value2 && !(m_value2 & CLASSMASK_ALL_PLAYABLE))
+            if (m_value2 && !(m_value2 & sClassRegistry.GetPlayableMask()))
             {
                 sLog.outErrorDb("Race_class condition (entry %u, type %u) has invalid race mask %u, skipped", m_entry, m_condition, m_value2);
                 return false;

@@ -54,6 +54,7 @@
 #include "HardcodedEvents.h"
 #include "miscellaneous/feature_transmog.h"
 #include "Geometry.h"
+#include "ClassRegistry.h"
 
 #include <limits>
 
@@ -2429,7 +2430,7 @@ void ObjectMgr::LoadItemPrototypes()
 
             if (req)
             {
-                if (!(proto->AllowableClass & CLASSMASK_ALL_PLAYABLE))
+                if (!(proto->AllowableClass & sClassRegistry.GetPlayableMask()))
                     sLog.outErrorDb("Item (Entry: %u) not have in `AllowableClass` any playable classes (%u) and can't be equipped or use.", i, proto->AllowableClass);
 
                 if (!(proto->AllowableRace & RACEMASK_ALL_PLAYABLE))
@@ -2925,7 +2926,7 @@ void ObjectMgr::LoadPlayerInfo()
             }
 
             ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(current_class);
-            if (!cEntry || !((1 << (current_class - 1)) & CLASSMASK_ALL_PLAYABLE))
+            if (!cEntry || !sClassRegistry.IsPlayableClass(current_class))
             {
                 sLog.outErrorDb("Wrong class %u in `playercreateinfo` table, ignoring.", current_class);
                 continue;
@@ -2981,7 +2982,7 @@ void ObjectMgr::LoadPlayerInfo()
                 }
 
                 ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(current_class);
-                if (!cEntry || !((1 << (current_class - 1)) & CLASSMASK_ALL_PLAYABLE))
+                if (!cEntry || !sClassRegistry.IsPlayableClass(current_class))
                 {
                     sLog.outErrorDb("Wrong class %u in `playercreateinfo_item` table, ignoring.", current_class);
                     continue;
@@ -3039,7 +3040,7 @@ void ObjectMgr::LoadPlayerInfo()
                 }
 
                 ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(current_class);
-                if (!cEntry || !((1 << (current_class - 1)) & CLASSMASK_ALL_PLAYABLE))
+                if (!cEntry || !sClassRegistry.IsPlayableClass(current_class))
                 {
                     sLog.outErrorDb("Wrong class %u in `playercreateinfo_spell` table, ignoring.", current_class);
                     continue;
@@ -3085,7 +3086,7 @@ void ObjectMgr::LoadPlayerInfo()
                 }
 
                 ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(current_class);
-                if (!cEntry || !((1 << (current_class - 1)) & CLASSMASK_ALL_PLAYABLE))
+                if (!cEntry || !sClassRegistry.IsPlayableClass(current_class))
                 {
                     sLog.outErrorDb("Wrong class %u in `playercreateinfo_action` table, ignoring.", current_class);
                     continue;
@@ -3213,7 +3214,7 @@ void ObjectMgr::LoadPlayerInfo()
             }
 
             ChrClassesEntry const* cEntry = sChrClassesStore.LookupEntry(current_class);
-            if (!cEntry || !((1 << (current_class - 1)) & CLASSMASK_ALL_PLAYABLE))
+            if (!cEntry || !sClassRegistry.IsPlayableClass(current_class))
             {
                 sLog.outErrorDb("Wrong class %u in `player_levelstats` table, ignoring.", current_class);
                 continue;
@@ -3254,7 +3255,7 @@ void ObjectMgr::LoadPlayerInfo()
         for (int class_ = 1; class_ < MAX_CLASSES; ++class_)
         {
             // skip nonexistent classes
-            if (!((1 << (class_ - 1)) & CLASSMASK_ALL_PLAYABLE) || !sChrClassesStore.LookupEntry(class_))
+            if (!sClassRegistry.IsPlayableClass(class_) || !sChrClassesStore.LookupEntry(class_))
                 continue;
 
             PlayerInfo* pInfo = &m_PlayerInfo[race][class_];
@@ -3805,7 +3806,7 @@ void ObjectMgr::LoadQuests()
         // RequiredClasses, can be 0/CLASSMASK_ALL_PLAYABLE to allow any class
         if (qinfo->RequiredClasses)
         {
-            if (!(qinfo->RequiredClasses & CLASSMASK_ALL_PLAYABLE))
+            if (!(qinfo->RequiredClasses & sClassRegistry.GetPlayableMask()))
             {
                 sLog.outErrorDb("Quest %u does not contain any playable classes in `RequiredClasses` (%u), value set to 0 (all classes).", qinfo->GetQuestId(), qinfo->RequiredClasses);
                 qinfo->RequiredClasses = 0;
