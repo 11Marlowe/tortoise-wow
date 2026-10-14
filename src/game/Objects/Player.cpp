@@ -25,6 +25,7 @@
 #include <ctime>
 
 #include "Player.h"
+#include "ClassRegistry.h"
 #include "Language.h"
 #include "Database/DatabaseEnv.h"
 #include "Log.h"
@@ -6652,89 +6653,31 @@ uint32 Player::GetShieldBlockValue() const
 
 float Player::GetMeleeCritFromAgility() const
 {
-    float valLevel1 = 0.0f;
-    float valLevel60 = 0.0f;
-    // critical
-    switch (GetClass())
-    {
-        case CLASS_PALADIN:
-        case CLASS_SHAMAN:
-        case CLASS_DRUID:
-            valLevel1 = 4.6f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_MAGE:
-            valLevel1 = 12.9f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_ROGUE:
-            valLevel1 = 2.2f;
-            valLevel60 = 29.0f;
-            break;
-        case CLASS_HUNTER:
-            valLevel1 = 3.5f;
-            valLevel60 = 53.0f;
-            break;
-        case CLASS_PRIEST:
-            valLevel1 = 11.0f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_WARLOCK:
-            valLevel1 = 8.4f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_WARRIOR:
-            valLevel1 = 3.9f;
-            valLevel60 = 20.0f;
-            break;
-        default:
-            return 0.0f;
-    }
-    float classrate = valLevel1 * float(60.0f - GetLevel()) / 59.0f + valLevel60 * float(GetLevel() - 1.0f) / 59.0f;
+    ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+    if (!descriptor)
+        return 0.0f;
+
+    float classrate = descriptor->meleeCritFromAgiAtLevel1 * float(60.0f - GetLevel()) / 59.0f
+        + descriptor->meleeCritFromAgiAtLevel60 * float(GetLevel() - 1.0f) / 59.0f;
+
+    if (classrate == 0.0f)
+        return 0.0f;
+
     return GetStat(STAT_AGILITY) / classrate;
 }
 
 float Player::GetDodgeFromAgility() const
 {
-    float valLevel1 = 0.0f;
-    float valLevel60 = 0.0f;
-    // critical
-    switch (GetClass())
-    {
-        case CLASS_PALADIN:
-        case CLASS_SHAMAN:
-        case CLASS_DRUID:
-            valLevel1 = 4.6f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_MAGE:
-            valLevel1 = 12.9f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_ROGUE:
-            valLevel1 = 1.1f;
-            valLevel60 = 14.5f;
-            break;
-        case CLASS_HUNTER:
-            valLevel1 = 1.8f;
-            valLevel60 = 26.5f;
-            break;
-        case CLASS_PRIEST:
-            valLevel1 = 11.0f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_WARLOCK:
-            valLevel1 = 8.4f;
-            valLevel60 = 20.0f;
-            break;
-        case CLASS_WARRIOR:
-            valLevel1 = 3.9f;
-            valLevel60 = 20.0f;
-            break;
-        default:
-            return 0.0f;
-    }
-    float classrate = valLevel1 * float(60.0f - GetLevel()) / 59.0f + valLevel60 * float(GetLevel() - 1.0f) / 59.0f;
+    ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+    if (!descriptor)
+        return 0.0f;
+
+    float classrate = descriptor->dodgeFromAgiAtLevel1 * float(60.0f - GetLevel()) / 59.0f
+        + descriptor->dodgeFromAgiAtLevel60 * float(GetLevel() - 1.0f) / 59.0f;
+
+    if (classrate == 0.0f)
+        return 0.0f;
+
     return GetStat(STAT_AGILITY) / classrate;
 }
 
@@ -6744,37 +6687,20 @@ float Player::GetSpellCritFromIntellect() const
     //   chance = base + INT / (rate0 + rate1 * LEVEL)
     // The formula keeps the crit chance at %5 on every level unless the player
     // increases his intelligence by other means (enchants, buffs, talents, ...)
+    // Per-class coefficients live in ClassRegistry (same values as the
+    // original 1.12 table).
 
-    //[TZERO] from mangos 3462 for 1.12 MUST BE CHECKED
-
-    static const struct
-    {
-        float base;
-        float rate0, rate1;
-    }
-    crit_data[MAX_CLASSES] =
-    {
-        {   0.0f,   0.0f,  10.0f  },                        //  0: unused
-        {   0.0f,   0.0f,  10.0f  },                        //  1: warrior
-        {   3.70f, 14.77f,  0.65f },                        //  2: paladin
-        {   0.0f,   0.0f,  10.0f  },                        //  3: hunter
-        {   0.0f,   0.0f,  10.0f  },                        //  4: rogue
-        {   2.97f, 10.03f,  0.82f },                        //  5: priest
-        {   0.0f,   0.0f,  10.0f  },                        //  6: unused
-        {   3.54f, 11.51f,  0.80f },                        //  7: shaman
-        {   3.70f, 14.77f,  0.65f },                        //  8: mage
-        {   3.18f, 11.30f,  0.82f },                        //  9: warlock
-        {   0.0f,   0.0f,  10.0f  },                        // 10: unused
-        {   3.33f, 12.41f,  0.79f }                         // 11: druid
-    };
     float crit_chance;
 
     // only players use intelligence for critical chance computations
     if (GetTypeId() == TYPEID_PLAYER)
     {
-        int my_class = GetClass();
-        float crit_ratio = crit_data[my_class].rate0 + crit_data[my_class].rate1 * GetLevel();
-        crit_chance = crit_data[my_class].base + GetStat(STAT_INTELLECT) / crit_ratio;
+        ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+        if (!descriptor)
+            return 0.0f;
+
+        float crit_ratio = descriptor->spellCritRate0 + descriptor->spellCritRate1 * GetLevel();
+        crit_chance = descriptor->spellCritBase + GetStat(STAT_INTELLECT) / crit_ratio;
     }
     else
         crit_chance = m_baseSpellCritChance;
