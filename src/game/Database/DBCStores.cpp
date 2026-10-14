@@ -27,6 +27,7 @@
 #include "DBCfmt.h"
 #include "SpellMgr.h"
 #include "ObjectMgr.h"
+#include "ClassRegistry.h"
 
 #include <map>
 #include <vector>
@@ -357,7 +358,7 @@ void LoadDBCStores(std::string const& dataPath)
                 continue;
 
             // prevent memory corruption; otherwise cls will become 12 below
-            if ((talentTabInfo->ClassMask & CLASSMASK_ALL_PLAYABLE) == 0)
+            if ((talentTabInfo->ClassMask & sClassRegistry.GetPlayableMask()) == 0)
                 continue;
 
             // store class talent tab pages
