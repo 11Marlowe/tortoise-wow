@@ -115,6 +115,22 @@ CharacterCreateOutcome CreateCharacter(uint32 accountId, CharacterCreateInfo con
         return outcome;
     }
 
+    // Module policy seam: scripts may refuse a race/class/gender combination
+    // (default: allow).  Runs after basic validation so hooks always see a
+    // valid pair.
+    bool creationAllowed = true;
+    ScriptRegistry<PlayerScript>::ForEachEnabledHook(PLAYERHOOK_CAN_CREATE_CHARACTER, [&](PlayerScript* script)
+    {
+        if (!script->CanCreateCharacter(accountId, info.race, info.class_, info.gender))
+            creationAllowed = false;
+    });
+    if (!creationAllowed)
+    {
+        outcome.result = CHAR_CREATE_FAILED;
+        outcome.failureReason = CharacterCreateFailureReason::NotAllowedByScript;
+        return outcome;
+    }
+
     std::string name = info.name;
     if (!normalizePlayerName(name))
     {

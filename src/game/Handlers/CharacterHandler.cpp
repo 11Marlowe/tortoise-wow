@@ -233,6 +233,9 @@ void WorldSession::HandleCharCreateOpcode(WorldPacket & recv_data)
         case CharacterCreateFailureReason::InvalidName:
             ProcessAnticheatAction("PassiveAnticheat", "Attempt to create character with invalid name", CHEAT_ACTION_INFO_LOG);
             break;
+        case CharacterCreateFailureReason::NotAllowedByScript:
+            ProcessAnticheatAction("PassiveAnticheat", "Attempt to create character refused by module policy", CHEAT_ACTION_INFO_LOG);
+            break;
         case CharacterCreateFailureReason::None:
             break;
     }
