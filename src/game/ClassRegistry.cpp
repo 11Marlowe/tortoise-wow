@@ -234,3 +234,85 @@ void ClassRegistry::LoadPlayableClasses()
 
     sLog.outString(">> Loaded %u additional playable class(es) from `playable_class` (mask 0x%X)", count, m_playableMask);
 }
+
+void ClassRegistry::LoadDescriptors()
+{
+    // Optional override table: NULL columns keep the built-in value, so a
+    // module only lists the fields it wants to change.
+    std::unique_ptr<QueryResult> tableResult(WorldDatabase.PQuery("SHOW TABLES LIKE 'class_descriptor'"));
+    if (!tableResult || tableResult->GetRowCount() == 0)
+        return;
+
+    std::unique_ptr<QueryResult> result(WorldDatabase.Query(
+        "SELECT `class`,"
+        "`ap_melee_level`,`ap_melee_str`,`ap_melee_agi`,`ap_melee_flat`,"
+        "`ap_ranged_level`,`ap_ranged_str`,`ap_ranged_agi`,`ap_ranged_flat`,"
+        "`ap_druid_forms`,`ap_lightning_reflexes`,"
+        "`base_crit`,`base_dodge`,"
+        "`melee_crit_agi_level1`,`melee_crit_agi_level60`,"
+        "`dodge_agi_level1`,`dodge_agi_level60`,"
+        "`spell_crit_base`,`spell_crit_rate0`,`spell_crit_rate1`,"
+        "`hp_per_spirit`,`hp_regen_flat`,`mp_spirit_divisor`,`mp_regen_flat`,"
+        "`caster_default`"
+        " FROM `class_descriptor`"));
+    if (!result)
+        return;
+
+    uint32 count = 0;
+    do
+    {
+        Field* fields = result->Fetch();
+        uint32 classId = fields[0].GetUInt32();
+
+        if (classId == 0 || classId >= MAX_CLASSES)
+        {
+            sLog.outErrorDb("Table `class_descriptor`: ignoring invalid class id %u.", classId);
+            continue;
+        }
+
+        ClassDescriptor* d = GetMutableDescriptor(classId);
+        if (!d)
+            continue;
+
+        auto applyFloat = [&](int idx, float& target)
+        {
+            if (!fields[idx].IsNULL())
+                target = fields[idx].GetFloat();
+        };
+        auto applyBool = [&](int idx, bool& target)
+        {
+            if (!fields[idx].IsNULL())
+                target = fields[idx].GetBool();
+        };
+
+        applyFloat(1,  d->meleeAp.levelCoef);
+        applyFloat(2,  d->meleeAp.strengthCoef);
+        applyFloat(3,  d->meleeAp.agilityCoef);
+        applyFloat(4,  d->meleeAp.flat);
+        applyFloat(5,  d->rangedAp.levelCoef);
+        applyFloat(6,  d->rangedAp.strengthCoef);
+        applyFloat(7,  d->rangedAp.agilityCoef);
+        applyFloat(8,  d->rangedAp.flat);
+        applyBool(9,   d->apUsesDruidForms);
+        applyBool(10,  d->apUsesLightningReflexes);
+        applyFloat(11, d->baseCrit);
+        applyFloat(12, d->baseDodge);
+        applyFloat(13, d->meleeCritFromAgiAtLevel1);
+        applyFloat(14, d->meleeCritFromAgiAtLevel60);
+        applyFloat(15, d->dodgeFromAgiAtLevel1);
+        applyFloat(16, d->dodgeFromAgiAtLevel60);
+        applyFloat(17, d->spellCritBase);
+        applyFloat(18, d->spellCritRate0);
+        applyFloat(19, d->spellCritRate1);
+        applyFloat(20, d->hpPerSpirit);
+        applyFloat(21, d->hpRegenFlat);
+        applyFloat(22, d->mpSpiritDivisor);
+        applyFloat(23, d->mpRegenFlat);
+        applyBool(24,  d->casterDefault);
+
+        ++count;
+    }
+    while (result->NextRow());
+
+    sLog.outString(">> Loaded %u class descriptor override(s) from `class_descriptor`", count);
+}

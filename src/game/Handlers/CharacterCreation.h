@@ -61,6 +61,7 @@ enum class CharacterCreateFailureReason : uint8
     InvalidClassOrRace,
     NonPlayableRace,
     InvalidName,
+    NotAllowedByScript,
 };
 
 // Outcome of CreateCharacter. `result` uses the same values as SharedDefines
