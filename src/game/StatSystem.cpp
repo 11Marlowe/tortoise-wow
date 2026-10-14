@@ -27,6 +27,7 @@
 #include "ObjectMgr.h"
 #include "ScriptMgr.h"
 #include "World.h"
+#include "ClassRegistry.h"
 
 /*#######################################
 ########                         ########
@@ -229,137 +230,112 @@ void Player::UpdateAttackPowerAndDamage(bool ranged)
     uint16 index_mod = UNIT_FIELD_ATTACK_POWER_MODS;
     uint16 index_mult = UNIT_FIELD_ATTACK_POWER_MULTIPLIER;
 
+    // Per-class base attack power (see ClassRegistry).  Druid shapeshift
+    // forms and the hunter Lightning Reflexes talent keep their special
+    // handling, gated by descriptor flags.
+    ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+    AttackPowerFormula const* formula = nullptr;
+
     if (ranged)
     {
         index = UNIT_FIELD_RANGED_ATTACK_POWER;
         index_mod = UNIT_FIELD_RANGED_ATTACK_POWER_MODS;
         index_mult = UNIT_FIELD_RANGED_ATTACK_POWER_MULTIPLIER;
 
-        switch (GetClass())
+        if (descriptor && descriptor->apUsesDruidForms)
         {
-            case CLASS_HUNTER:
-                val2 = level * 2.0f + GetStat(STAT_AGILITY) * 2.0f - 10.0f;
-                break;
-            case CLASS_ROGUE:
-                val2 = level        + GetStat(STAT_AGILITY) - 10.0f;
-                break;
-            case CLASS_WARRIOR:
-                val2 = level        + GetStat(STAT_AGILITY) - 10.0f;
-                break;
-            case CLASS_DRUID:
-                switch (GetShapeshiftForm())
-                {
-                    case FORM_CAT:
-                    case FORM_BEAR:
-                    case FORM_DIREBEAR:
-                        val2 = 0.0f;
-                        break;
-                    default:
-                        val2 = GetStat(STAT_AGILITY) - 10.0f;
-                        break;
-                }
-                break;
-            default:
-                val2 = GetStat(STAT_AGILITY) - 10.0f;
-                break;
+            switch (GetShapeshiftForm())
+            {
+                case FORM_CAT:
+                case FORM_BEAR:
+                case FORM_DIREBEAR:
+                    val2 = 0.0f;
+                    break;
+                default:
+                    val2 = GetStat(STAT_AGILITY) - 10.0f;
+                    break;
+            }
         }
+        else if (descriptor)
+            formula = &descriptor->rangedAp;
     }
     else
     {
-        switch (GetClass())
+        if (descriptor && descriptor->apUsesDruidForms)
         {
-            case CLASS_WARRIOR:
-                val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f                    - 20.0f;
-                break;
-            case CLASS_PALADIN:
-                val2 = level * 3.0f + GetStat(STAT_STRENGTH) * 2.0f                    - 20.0f;
-                break;
-            case CLASS_ROGUE:
-                val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
-                break;
-            case CLASS_HUNTER:
+            ShapeshiftForm form = GetShapeshiftForm();
+            //Check if Predatory Strikes is skilled
+            float mLevelMult = 0.0;
+            switch (form)
             {
-                val2 = level * 2.0f + GetStat(STAT_STRENGTH) + GetStat(STAT_AGILITY) - 20.0f;
-
-                // Lightning Reflexes talent: add melee AP based on Agility (apply directly to base AP)
-                float lightningReflexesPct = 0.0f;
-                static constexpr struct
+                case FORM_CAT:
+                case FORM_BEAR:
+                case FORM_DIREBEAR:
                 {
-                    uint32 spellId;
-                    float percent;
-                } lightningReflexesRanks[] =
-                {
-                    { 19168, 0.20f },
-                    { 19180, 0.40f },
-                    { 19181, 0.60f },
-                    { 24296, 0.80f },
-                    { 24297, 1.00f },
-                };
-
-                for (const auto& rank : lightningReflexesRanks)
-                {
-                    if (HasAura(rank.spellId) && rank.percent > lightningReflexesPct)
-                        lightningReflexesPct = rank.percent;
-                }
-
-                if (lightningReflexesPct > 0.0f)
-                    val2 += GetStat(STAT_AGILITY) * lightningReflexesPct;
-                break;
-            }
-            case CLASS_SHAMAN:
-                val2 = level * 2.0f + GetStat(STAT_STRENGTH) * 2.0f                    - 20.0f;
-                break;
-            case CLASS_DRUID:
-            {
-                ShapeshiftForm form = GetShapeshiftForm();
-                //Check if Predatory Strikes is skilled
-                float mLevelMult = 0.0;
-                switch (form)
-                {
-                    case FORM_CAT:
-                    case FORM_BEAR:
-                    case FORM_DIREBEAR:
+                    Unit::AuraList const& mDummy = GetAurasByType(SPELL_AURA_DUMMY);
+                    for (const auto itr : mDummy)
                     {
-                        Unit::AuraList const& mDummy = GetAurasByType(SPELL_AURA_DUMMY);
-                        for (const auto itr : mDummy)
+                        // Predatory Strikes
+                        if (itr->GetSpellProto()->SpellIconID == 1563)
                         {
-                            // Predatory Strikes
-                            if (itr->GetSpellProto()->SpellIconID == 1563)
-                            {
-                                mLevelMult = itr->GetModifier()->m_amount / 100.0f;
-                                break;
-                            }
+                            mLevelMult = itr->GetModifier()->m_amount / 100.0f;
+                            break;
                         }
-                        break;
                     }
-                    default:
-                        break;
+                    break;
                 }
-
-                switch (form)
-                {
-                    case FORM_CAT:
-                        val2 = GetLevel() * mLevelMult + GetStat(STAT_STRENGTH) * 2.0f + GetStat(STAT_AGILITY) - 20.0f;
-                        break;
-                    case FORM_BEAR:
-                    case FORM_DIREBEAR:
-                        val2 = GetLevel() * mLevelMult + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
-                        break;
-                    default:
-                        val2 = GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
-                        break;
-                }
-                break;
+                default:
+                    break;
             }
-            case CLASS_MAGE:
-                val2 =              GetStat(STAT_STRENGTH)                         - 10.0f;
-                break;
-            case CLASS_PRIEST:
-                val2 =              GetStat(STAT_STRENGTH)                         - 10.0f;
-                break;
-            case CLASS_WARLOCK:
-                val2 =              GetStat(STAT_STRENGTH)                         - 10.0f;
-                break;
+
+            switch (form)
+            {
+                case FORM_CAT:
+                    val2 = GetLevel() * mLevelMult + GetStat(STAT_STRENGTH) * 2.0f + GetStat(STAT_AGILITY) - 20.0f;
+                    break;
+                case FORM_BEAR:
+                case FORM_DIREBEAR:
+                    val2 = GetLevel() * mLevelMult + GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+                    break;
+                default:
+                    val2 = GetStat(STAT_STRENGTH) * 2.0f - 20.0f;
+                    break;
+            }
+        }
+        else if (descriptor)
+            formula = &descriptor->meleeAp;
+    }
+
+    if (formula)
+    {
+        val2 = level * formula->levelCoef + GetStat(STAT_STRENGTH) * formula->strengthCoef
+            + GetStat(STAT_AGILITY) * formula->agilityCoef + formula->flat;
+
+        // Lightning Reflexes talent (hunter): add melee AP based on Agility (apply directly to base AP)
+        if (!ranged && descriptor->apUsesLightningReflexes)
+        {
+            float lightningReflexesPct = 0.0f;
+            static constexpr struct
+            {
+                uint32 spellId;
+                float percent;
+            } lightningReflexesRanks[] =
+            {
+                { 19168, 0.20f },
+                { 19180, 0.40f },
+                { 19181, 0.60f },
+                { 24296, 0.80f },
+                { 24297, 1.00f },
+            };
+
+            for (const auto& rank : lightningReflexesRanks)
+            {
+                if (HasAura(rank.spellId) && rank.percent > lightningReflexesPct)
+                    lightningReflexesPct = rank.percent;
+            }
+
+            if (lightningReflexesPct > 0.0f)
+                val2 += GetStat(STAT_AGILITY) * lightningReflexesPct;
         }
     }
 
@@ -532,27 +508,8 @@ void Player::UpdateCritPercentage(WeaponAttackType attType)
     }
 
     float value = GetTotalPercentageModValue(modGroup);
-    switch (GetClass())
-    {
-        case CLASS_DRUID:
-            value += 0.9f;
-            break;
-        case CLASS_MAGE:
-            value += 3.2f;
-            break;
-        case CLASS_PALADIN:
-            value += 0.7f;
-            break;
-        case CLASS_PRIEST:
-            value += 3.0f;
-            break;
-        case CLASS_SHAMAN:
-            value += 1.7f;
-            break;
-        case CLASS_WARLOCK:
-            value += 2.0f;
-            break;
-    }
+    if (ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass()))
+        value += descriptor->baseCrit;
     // Modify crit from weapon skill and maximized defense skill of same level victim difference
     value += (int32(GetWeaponSkillValue(attType)) - int32(GetSkillMaxForLevel())) * 0.04f;
     value = value < 0.0f ? 0.0f : value;
@@ -591,27 +548,8 @@ void Player::UpdateDodgePercentage()
 {
     // Nostalrius : base dodge per class
     float value = 0.0f;
-    switch (GetClass())
-    {
-        case CLASS_DRUID:
-            value += 0.9f;
-            break;
-        case CLASS_MAGE:
-            value += 3.2f;
-            break;
-        case CLASS_PALADIN:
-            value += 0.7f;
-            break;
-        case CLASS_PRIEST:
-            value += 3.0f;
-            break;
-        case CLASS_SHAMAN:
-            value += 1.7f;
-            break;
-        case CLASS_WARLOCK:
-            value += 2.0f;
-            break;
-    }
+    if (ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass()))
+        value += descriptor->baseDodge;
     // Dodge from agility
     value += GetDodgeFromAgility();
     // Modify value from defense skill
