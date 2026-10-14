@@ -99,6 +99,10 @@ class ClassRegistry
         // `playable_class` table on top of it.
         void LoadPlayableClasses();
 
+        // Applies optional per-class descriptor overrides from the
+        // `class_descriptor` table (NULL columns keep the built-in value).
+        void LoadDescriptors();
+
         // Mask of the classes currently considered playable.
         uint32 GetPlayableMask() const { return m_playableMask; }
 

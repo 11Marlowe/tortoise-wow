@@ -1963,9 +1963,12 @@ void LoadPlayerEggLoot();
 
     CheckEggExploit();
 
-    ///- Runtime playable-class mask (must be loaded before DBC/player-info loading)
+    ///- Runtime playable-class mask and stat descriptors (must be loaded
+    ///  before DBC/player-info loading)
     sLog.outString("Loading playable classes...");
     sClassRegistry.LoadPlayableClasses();
+    sLog.outString("Loading class descriptors...");
+    sClassRegistry.LoadDescriptors();
 
     ///- Loads existing IDs in the database.
     sLog.outString("Loading existing IDs in the database...");

@@ -153,6 +153,7 @@ enum PlayerHook
     PLAYERHOOK_IS_MANAGED_BOT,
     PLAYERHOOK_GET_BOT_ROLES,
     PLAYERHOOK_ON_ADDON_MESSAGE,
+    PLAYERHOOK_CAN_CREATE_CHARACTER,
     PLAYERHOOK_END
 };
 
@@ -192,6 +193,12 @@ class PlayerScript : public ScriptObject
         virtual void OnBeforeLogout(Player* /*player*/) {}
         virtual void OnLogout(Player* /*player*/) {}
         virtual void OnCreate(Player* /*player*/) {}
+
+        // Module policy seam for character creation: return false to refuse
+        // creating a character with this race/class/gender combination.
+        // Default: allow everything the core considers valid.
+        virtual bool CanCreateCharacter(uint32 /*accountId*/, uint32 /*race*/, uint32 /*class_*/, uint8 /*gender*/) { return true; }
+
         virtual void OnDelete(ObjectGuid /*guid*/, uint32 /*accountId*/) {}
         virtual void OnSave(Player* /*player*/) {}
         virtual void OnUpdateZone(Player* /*player*/, uint32 /*newZone*/, uint32 /*newArea*/) {}

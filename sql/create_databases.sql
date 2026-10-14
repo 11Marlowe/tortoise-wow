@@ -8300,6 +8300,43 @@ CREATE TABLE `player_census` (
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
+-- Table structure for table `class_descriptor`
+--
+
+DROP TABLE IF EXISTS `class_descriptor`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!40101 SET character_set_client = utf8mb4 */;
+CREATE TABLE `class_descriptor` (
+  `class` tinyint(3) unsigned NOT NULL DEFAULT 0,
+  `ap_melee_level` float DEFAULT NULL,
+  `ap_melee_str` float DEFAULT NULL,
+  `ap_melee_agi` float DEFAULT NULL,
+  `ap_melee_flat` float DEFAULT NULL,
+  `ap_ranged_level` float DEFAULT NULL,
+  `ap_ranged_str` float DEFAULT NULL,
+  `ap_ranged_agi` float DEFAULT NULL,
+  `ap_ranged_flat` float DEFAULT NULL,
+  `ap_druid_forms` tinyint(1) DEFAULT NULL,
+  `ap_lightning_reflexes` tinyint(1) DEFAULT NULL,
+  `base_crit` float DEFAULT NULL,
+  `base_dodge` float DEFAULT NULL,
+  `melee_crit_agi_level1` float DEFAULT NULL,
+  `melee_crit_agi_level60` float DEFAULT NULL,
+  `dodge_agi_level1` float DEFAULT NULL,
+  `dodge_agi_level60` float DEFAULT NULL,
+  `spell_crit_base` float DEFAULT NULL,
+  `spell_crit_rate0` float DEFAULT NULL,
+  `spell_crit_rate1` float DEFAULT NULL,
+  `hp_per_spirit` float DEFAULT NULL,
+  `hp_regen_flat` float DEFAULT NULL,
+  `mp_spirit_divisor` float DEFAULT NULL,
+  `mp_regen_flat` float DEFAULT NULL,
+  `caster_default` tinyint(1) DEFAULT NULL,
+  PRIMARY KEY (`class`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+
+--
 -- Table structure for table `playable_class`
 --
 
