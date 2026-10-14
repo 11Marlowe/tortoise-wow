@@ -19,6 +19,7 @@
  */
 
 #include "Unit.h"
+#include "ClassRegistry.h"
 #include "Log.h"
 #include "Opcodes.h"
 #include "WorldPacket.h"
@@ -6887,76 +6888,25 @@ int32 Unit::ModifyPower(Powers power, int32 dVal)
 
 float Unit::GetRegenHPPerSpirit() const
 {
-    float regen = 0.0f;
+    ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+    if (!descriptor)
+        return 0.0f;
 
     float Spirit = GetStat(STAT_SPIRIT);
-    uint8 Class = GetClass();
-
-    switch (Class)
-    {
-        case CLASS_DRUID:
-            regen = (Spirit * 0.11 + 1);
-            break;
-        case CLASS_HUNTER:
-            regen = (Spirit * 0.43 - 5.5);
-            break;
-        case CLASS_MAGE:
-            regen = (Spirit * 0.11 + 1);
-            break;
-        case CLASS_PALADIN:
-            regen = (Spirit * 0.25);
-            break;
-        case CLASS_PRIEST:
-            regen = (Spirit * 0.15 + 1.4);
-            break;
-        case CLASS_ROGUE:
-            regen = (Spirit * 0.84 - 13);
-            break;
-        case CLASS_SHAMAN:
-            regen = (Spirit * 0.28 - 3.6);
-            break;
-        case CLASS_WARLOCK:
-            regen = (Spirit * 0.12 + 1.5);
-            break;
-        case CLASS_WARRIOR:
-            regen = (Spirit * 1.26 - 22.6);
-            break;
-    }
+    float regen = (Spirit * descriptor->hpPerSpirit + descriptor->hpRegenFlat);
 
     return std::max(0.0f, regen);
 }
 
 float Unit::GetRegenMPPerSpirit() const
 {
-    float addvalue = 0.0;
+    ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass());
+    if (!descriptor)
+        return 0.0f;
 
     float Spirit = GetStat(STAT_SPIRIT);
-    uint8 Class = GetClass();
 
-    switch (Class)
-    {
-        case CLASS_DRUID:
-            addvalue = (Spirit / 5 + 15);
-            break;
-        case CLASS_HUNTER:
-            addvalue = (Spirit / 5 + 15);
-            break;
-        case CLASS_MAGE:
-            addvalue = (Spirit / 4 + 12.5);
-            break;
-        case CLASS_PALADIN:
-            addvalue = (Spirit / 5 + 15);
-            break;
-        case CLASS_PRIEST:
-            addvalue = (Spirit / 4 + 12.5);
-            break;
-        case CLASS_SHAMAN:
-            addvalue = (Spirit / 5 + 17);
-            break;
-        case CLASS_WARLOCK:
-            addvalue = (Spirit / 5 + 15);
-            break;
-    }
+    float addvalue = (Spirit / descriptor->mpSpiritDivisor + descriptor->mpRegenFlat);
 
     addvalue /= 2.0f;   // the above addvalue are given per tick which occurs every 2 seconds, hence this divide by 2
 
@@ -11220,14 +11170,6 @@ bool Unit::IsCaster() const
 
     switch (GetClass())
     {
-        case CLASS_WARRIOR:
-        case CLASS_ROGUE:
-            return false;
-        case CLASS_MAGE:
-        case CLASS_PRIEST:
-        case CLASS_HUNTER:
-        case CLASS_WARLOCK:
-            return true;
         case CLASS_SHAMAN:
             return !HasSpell(17364); // Stormstrike
         case CLASS_PALADIN:
@@ -11235,8 +11177,13 @@ bool Unit::IsCaster() const
         case CLASS_DRUID:
             return HasSpell(24858) || HasSpell(18562); // Moonkin Form / Swiftmend
         default:
-            return false;
+            break;
     }
+
+    if (ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(GetClass()))
+        return descriptor->casterDefault;
+
+    return false;
 }
 
 bool Unit::IsImmuneToSchoolMask(uint32 schoolMask) const
