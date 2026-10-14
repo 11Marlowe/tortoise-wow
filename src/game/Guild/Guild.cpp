@@ -35,6 +35,7 @@
 #include "Anticheat.h"
 #include "ScriptObjects.h"
 #include "Item.h"
+#include "ClassRegistry.h"
 
 #define MAX_UNCOMPRESSED_PACKET_SIZE 0x8000 
 
@@ -250,7 +251,7 @@ GuildAddStatus Guild::AddMember(ObjectGuid plGuid, uint32 plRank)
         newmember.ZoneId = data->uiZoneId;
         newmember.accountId = data->uiAccount;
 
-        if (newmember.Level < 1 || newmember.Level > PLAYER_STRONG_MAX_LEVEL || !((1 << (newmember.Class - 1)) & CLASSMASK_ALL_PLAYABLE))
+        if (newmember.Level < 1 || newmember.Level > PLAYER_STRONG_MAX_LEVEL || !sClassRegistry.IsPlayableClass(newmember.Class))
         {
             sLog.outError("%s has a broken data in field `characters` table, cannot add him to guild.", plGuid.GetString().c_str());
             return GuildAddStatus::PLAYER_DATA_ERROR;
@@ -512,7 +513,7 @@ bool Guild::LoadMembersFromDB(QueryResult *guildMembersResult)
             // the zone through xy coords .. this is a bit redundant, but shouldn't be called often
             newmember.ZoneId = Player::GetZoneIdFromDB(newmember.guid);
         }
-        if (!((1 << (newmember.Class - 1)) & CLASSMASK_ALL_PLAYABLE)) // can be at broken `class` field
+        if (!sClassRegistry.IsPlayableClass(newmember.Class)) // can be at broken `class` field
         {
             sLog.outError("%s has a broken data in field `characters`.`class`, deleting him from guild!", newmember.guid.GetString().c_str());
             CharacterDatabase.PExecute("DELETE FROM guild_member WHERE guid = '%u'", lowguid);

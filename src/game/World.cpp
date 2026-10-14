@@ -78,6 +78,7 @@
 #include "HonorMgr.h"
 #include "ThreadPool.h"
 #include "AuraRemovalMgr.h"
+#include "ClassRegistry.h"
 #include "GuardMgr.h"
 #include "DailyQuestHandler.h"
 #include "GuidObjectScaling.h"
@@ -2002,6 +2003,10 @@ void LoadPlayerEggLoot();
     }
 
     CheckEggExploit();
+
+    ///- Runtime playable-class mask (must be loaded before DBC/player-info loading)
+    sLog.outString("Loading playable classes...");
+    sClassRegistry.LoadPlayableClasses();
 
     ///- Loads existing IDs in the database.
     sLog.outString("Loading existing IDs in the database...");

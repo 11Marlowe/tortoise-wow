@@ -20,6 +20,7 @@ set (game_SRCS
     AuraRemovalMgr.cpp
     AutoBroadCastMgr.cpp
     Camera.cpp
+    ClassRegistry.cpp
     Conditions.cpp
     CreatureGroups.cpp
     CustomMerchantMgr.cpp
@@ -229,6 +230,7 @@ set (game_SRCS
     AuraRemovalMgr.h
     AutoBroadCastMgr.h
     Camera.h
+    ClassRegistry.h
     Conditions.h
     CreatureGroups.h
     CustomMerchantMgr.h
