@@ -89,12 +89,6 @@ public:
     void OnDuelRequest(Player* target, Player* challenger) override { if (Eluna* e = target->GetEluna()) e->OnDuelRequest(target, challenger); }
     void OnDuelStart(Player* player1, Player* player2) override { if (Eluna* e = player1->GetEluna()) e->OnDuelStart(player1, player2); }
     void OnDuelEnd(Player* winner, Player* loser, uint32 type) override { if (Eluna* e = winner->GetEluna()) e->OnDuelEnd(winner, loser, static_cast<DuelCompleteType>(type)); }
-    bool CanUseGroupChat(Player* player, uint32 type, uint32 language, std::string& message) override
-    {
-        if (Eluna* e = player->GetEluna())
-            return e->OnChat(player, type, language, message);
-        return true;
-    }
     void OnEmote(Player* player, uint32 emote) override { if (Eluna* e = player->GetEluna()) e->OnEmote(player, emote); }
     void OnTextEmote(Player* player, uint32 textEmote, uint32 emoteNum, ObjectGuid guid) override { if (Eluna* e = player->GetEluna()) e->OnTextEmote(player, textEmote, emoteNum, guid); }
     void OnSpellCast(Player* player, Spell* spell, bool skipCheck) override { if (Eluna* e = player->GetEluna()) e->OnSpellCast(player, spell, skipCheck); }
@@ -155,7 +149,6 @@ public:
     ElunaItemScript() : AllItemScript("ElunaItemScript") {}
     bool CanItemUse(Player* player, Item* item, SpellCastTargets& targets) override { if (Eluna* e = player->GetEluna()) return !e->OnUse(player, item, targets); return false; }
     bool CanItemQuestAccept(Player* player, Item* item, Quest const* quest) override { if (Eluna* e = player->GetEluna()) return e->OnQuestAccept(player, item, quest); return false; }
-    void OnItemRemove(Player* player, Item* item) override { if (Eluna* e = player->GetEluna()) e->OnRemove(player, item); }
 };
 
 class ElunaLootScript final : public LootScript
