@@ -800,6 +800,9 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
         SendNotification(LANG_RESET_TALENTS);               // we can use SMSG_TALENTS_INVOLUNTARILY_RESET here
     }
 
+#ifdef ENABLE_ELUNA
+    bool const elunaFirstLogin = pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST);
+#endif
     if (pCurrChar->HasAtLoginFlag(AT_LOGIN_FIRST))
     {
         pCurrChar->RemoveAtLoginFlag(AT_LOGIN_FIRST);
@@ -915,7 +918,7 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
         script->OnLogin(pCurrChar);
     });
 #ifdef ENABLE_ELUNA
-    if (showedIntroCinematic)
+    if (elunaFirstLogin)
         if (Eluna* e = pCurrChar->GetEluna())
             e->OnFirstLogin(pCurrChar);
 #endif
