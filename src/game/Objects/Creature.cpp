@@ -65,6 +65,9 @@
 
 // apply implementation of the singletons
 #include "Policies/SingletonImp.h"
+#ifdef ENABLE_ELUNA
+#include "ScriptObjects.h"
+#endif
 
 
 TrainerSpell const* TrainerSpellData::Find(uint32 spell_id) const
@@ -266,6 +269,13 @@ void Creature::AddToWorld()
         AIM_Initialize();
     if (!bWasInWorld && m_zoneScript)
         m_zoneScript->OnCreatureCreate(this);
+#ifdef ENABLE_ELUNA
+    if (!bWasInWorld && IsInWorld())
+        ScriptRegistry<AllCreatureScript>::ForEach([&](AllCreatureScript* script)
+        {
+            script->OnCreatureAddWorld(this);
+        });
+#endif
 }
 
 void Creature::RemoveFromWorld()
