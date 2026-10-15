@@ -11780,6 +11780,11 @@ void Unit::RemoveSpellCategoryCooldown(uint32 category, bool update)
     }
 }
 
+bool Unit::IsSpellReady(SpellEntry const* spellInfo) const
+{
+    return spellInfo && !HasSpellCooldown(spellInfo->Id);
+}
+
 bool Unit::IsTotalImmune() const
 {
     uint32 immuneMask = 0;
