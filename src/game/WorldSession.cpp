@@ -58,9 +58,9 @@
 
 #ifdef USING_DISCORD_BOT
 #include "DiscordBot/Bot.hpp"
+#endif
 #ifdef ENABLE_ELUNA
 #include "ElunaConfig.h"
-#endif
 #endif
 
 // select opcodes appropriate for processing in Map::Update context for current session state

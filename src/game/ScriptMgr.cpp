@@ -2050,10 +2050,24 @@ bool ScriptMgr::OnGossipSelect(Player* pPlayer, GameObject* pGameObject, uint32 
         }
     }
 
+#ifdef ENABLE_ELUNA
+    if (ScriptRegistry<AllGameObjectScript>::ForEachWithReturn([&](AllGameObjectScript* script)
+    {
+        return script->CanGameObjectGossipSelect(pPlayer, pGameObject, sender, action, code);
+    }))
+        return true;
+
+    if (Eluna* e = pPlayer->GetEluna())
+        return code ? e->OnGossipSelectCode(pPlayer, pGameObject, sender, action, code)
+                    : e->OnGossipSelect(pPlayer, pGameObject, sender, action);
+
+    return false;
+#else
     return ScriptRegistry<AllGameObjectScript>::ForEachWithReturn([&](AllGameObjectScript* script)
     {
         return script->CanGameObjectGossipSelect(pPlayer, pGameObject, sender, action, code);
     });
+#endif
 }
 
 bool ScriptMgr::OnQuestAccept(Player* pPlayer, Creature* pCreature, Quest const* pQuest)
@@ -2167,11 +2181,6 @@ bool ScriptMgr::OnQuestRewardedByScript(Player* pPlayer, Quest const* pQuest)
             return true;
         }
     }
-#ifdef ENABLE_ELUNA
-    if (Eluna* e = pPlayer->GetEluna())
-        return code ? e->OnGossipSelectCode(pPlayer, pGameObject, sender, action, code)
-                    : e->OnGossipSelect(pPlayer, pGameObject, sender, action);
-#endif
 
     return false;
 }

@@ -11779,6 +11779,35 @@ void Unit::RemoveSpellCategoryCooldown(uint32 category, bool update)
                 player->SendClearCooldown(spellId, this);
     }
 }
+
+bool Unit::IsTotalImmune() const
+{
+    uint32 immuneMask = 0;
+    for (Aura const* aura : GetAurasByType(SPELL_AURA_SCHOOL_IMMUNITY))
+        immuneMask |= aura->GetModifier()->m_miscvalue;
+
+    return immuneMask == SPELL_SCHOOL_MASK_ALL;
+}
+
+struct IsAttackingPlayerHelper
+{
+    bool operator()(Unit const* unit) const { return unit->isAttackingPlayer(); }
+};
+
+bool Unit::isAttackingPlayer() const
+{
+    if (GetTargetGuid().IsPlayer())
+        return true;
+
+    return CheckAllControlledUnits(IsAttackingPlayerHelper(), CONTROLLED_PET | CONTROLLED_TOTEMS | CONTROLLED_GUARDIANS | CONTROLLED_CHARM);
+}
+
+bool Unit::IsTargetableBy(WorldObject const* caster, bool forAoE, bool checkAlive, bool helpful) const
+{
+    Unit const* casterUnit = caster ? caster->ToUnit() : nullptr;
+    bool const attackerIsPlayer = casterUnit && casterUnit->IsCharmerOrOwnerPlayerOrPlayerItself();
+    return IsTargetable(!helpful, attackerIsPlayer, forAoE, checkAlive);
+}
 #endif
 bool Unit::HasSpellCategoryCooldown(uint32 cat) const
 {
