@@ -565,6 +565,7 @@ class Unit : public WorldObject
         bool IsAlive() const { return (m_deathState == ALIVE); }
 #ifdef ENABLE_ELUNA
         bool IsDying() const { return m_deathState == JUST_DIED; }
+        bool IsSpellReady(SpellEntry const* spellInfo) const { return spellInfo && !HasSpellCooldown(spellInfo->Id); }
 #endif
         bool IsDead() const { return ((m_deathState == DEAD) || (m_deathState == CORPSE)); }
 

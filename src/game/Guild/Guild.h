@@ -238,6 +238,9 @@ class Guild
         std::string const& GetName() const { return m_Name; }
         std::string const& GetMOTD() const { return m_motd; }
         std::string const& GetInfo() const { return m_info; }
+#ifdef ENABLE_ELUNA
+        std::string const& GetGINFO() const { return m_info; }
+#endif
 
         void Rename(std::string& newName);
 

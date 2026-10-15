@@ -1782,6 +1782,11 @@ class Player final: public Unit
     public:
 #ifdef ENABLE_ELUNA
         uint32 GetResetTalentsCost() const;
+        // Used by Eluna's VMaNGOS Player methods.
+        float GetHealthBonusFromStamina() const { return GetHealthBonusFromStamina(GetStat(STAT_STAMINA)); }
+        float GetManaBonusFromIntellect() const { return GetManaBonusFromIntellect(GetStat(STAT_INTELLECT)); }
+        Item* GetItemByEntry(uint32 entry) const;
+        void Whisper(std::string const& text, uint32 language, ObjectGuid receiver);
 #endif
         uint32 GetFreeTalentPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS1); }
         void SetFreeTalentPoints(uint32 points) { SetUInt32Value(PLAYER_CHARACTER_POINTS1, points); }

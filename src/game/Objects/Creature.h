@@ -215,7 +215,11 @@ struct CreatureInfo
     uint32  unit_class = 0;                                 // enum Classes. Note only 4 classes are known for creatures.
     uint32  unit_flags = 0;                                 // enum UnitFlags mask values
     uint32  dynamic_flags = 0;
+#ifdef ENABLE_ELUNA
+    union { uint32  beast_family = 0; uint32 pet_family; }; // enum CreatureFamily values (optional); pet_family is Eluna's name
+#else
     uint32  beast_family = 0;                               // enum CreatureFamily values (optional)
+#endif
     uint32  trainer_type = 0;
     uint32  trainer_spell = 0;
     uint32  trainer_class = 0;
