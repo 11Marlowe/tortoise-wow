@@ -33,6 +33,7 @@
 #include "AuraRemovalMgr.h"
 #include "PerfStats.h"
 #include "ScriptObjects.h"
+#include "ClassRegistry.h"
 
 //numbers represent minutes * 100 while happy (you get 100 loyalty points per min while happy)
 uint32 const LevelUpLoyalty[6] =
@@ -2325,10 +2326,23 @@ bool Pet::IsPermanentPetFor(Player* owner) const
             // oddly enough, Mage's Water Elemental is still treated as temporary pet with Glyph of Eternal Water
             // i.e. does not unsummon at mounting, gets dismissed at teleport etc.
             case CLASS_WARLOCK:
-                return GetCreatureInfo()->type == CREATURE_TYPE_DEMON;
+                if (GetCreatureInfo()->type == CREATURE_TYPE_DEMON)
+                    return true;
+                break;
             default:
-                return false;
+                break;
         }
+
+        // class-support: module-provided classes may declare which creature
+        // types their summon pets are permanent for (ClassDescriptor; empty
+        // mask keeps the vanilla behavior).  See ClassRegistry.h.
+        if (ClassDescriptor const* descriptor = sClassRegistry.GetDescriptor(owner->GetClass()))
+        {
+            CreatureInfo const* info = GetCreatureInfo();
+            if (descriptor->permanentSummonPetTypes && info && info->type > 0 && info->type <= 32)
+                return (descriptor->permanentSummonPetTypes & (uint32(1) << (info->type - 1))) != 0;
+        }
+        return false;
     case HUNTER_PET:
         return true;
     default:
