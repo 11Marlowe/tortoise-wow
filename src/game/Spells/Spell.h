@@ -39,7 +39,12 @@
 
 #include <memory>
 
-#define MAX_SPELL_ID 60000
+// Upper sanity bound for castable spell ids.  Was 60000, which silently
+// dropped any cast above it (Spell::cast returns early) - Turtle's own custom
+// spell ids and module-provided classes exceed that.  65535 keeps the guard
+// while allowing the full 16-bit id space; spell data itself is sized from
+// MAX(entry) in spell_template (SpellMgr::LoadSpells).
+#define MAX_SPELL_ID 65535
 
 // For Plainsrunning hackfixes:
 
