@@ -1570,6 +1570,7 @@ class Player final: public Unit
         void UpdateForQuestWorldObjects();
         bool CanShareQuest(uint32 quest_id) const;
         QuestStatusMap& getQuestStatusMap() { return mQuestStatus; };
+        QuestStatusMap& GetQuestStatusMap() { return mQuestStatus; }
 
         void SendQuestCompleteEvent(uint32 quest_id) const;
         void SendQuestReward(Quest const* pQuest, uint32 XP, Object* questGiver) const;
@@ -1770,11 +1771,11 @@ class Player final: public Unit
         uint32 m_extraBonusTalentCount;
 
         void UpdateFreeTalentPoints(bool resetIfNeed = true);
-        uint32 GetResetTalentsCost() const;
         void UpdateResetTalentsMultiplier() const;
         uint32 CalculateTalentsPoints() const;
         void SendTalentWipeConfirm(ObjectGuid guid) const;
     public:
+        uint32 GetResetTalentsCost() const;
         uint32 GetFreeTalentPoints() const { return GetUInt32Value(PLAYER_CHARACTER_POINTS1); }
         void SetFreeTalentPoints(uint32 points) { SetUInt32Value(PLAYER_CHARACTER_POINTS1, points); }
         void SetBonusTalentCount(uint32 count) { m_extraBonusTalentCount = count; UpdateFreeTalentPoints(); }

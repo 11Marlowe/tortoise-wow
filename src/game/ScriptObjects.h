@@ -723,6 +723,9 @@ class GroupScript : public ScriptObject
     protected:
         explicit GroupScript(char const* name) : ScriptObject(name) { ScriptRegistry<GroupScript>::AddScript(this); }
     public:
+        virtual void OnCreate(Group* /*group*/, ObjectGuid /*leaderGuid*/, uint8 /*groupType*/) {}
+        virtual void OnInviteMember(Group* /*group*/, ObjectGuid /*guid*/) {}
+        virtual bool CanMemberAccept(Group* /*group*/, Player* /*player*/) { return true; }
         virtual void OnAddMember(Group* /*group*/, ObjectGuid /*guid*/) {}
         virtual void OnRemoveMember(Group* /*group*/, ObjectGuid /*guid*/, uint8 /*method*/) {}
         virtual void OnChangeLeader(Group* /*group*/, ObjectGuid /*newLeaderGuid*/, ObjectGuid /*oldLeaderGuid*/) {}
@@ -740,6 +743,8 @@ class GuildScript : public ScriptObject
         virtual void OnCreate(Guild* /*guild*/, Player* /*leader*/, std::string const& /*name*/) {}
         virtual void OnDisband(Guild* /*guild*/) {}
         virtual void OnGuildInvite(Player* /*invited*/) {}
+        virtual void OnMotdChanged(Guild* /*guild*/, std::string const& /*motd*/) {}
+        virtual void OnInfoChanged(Guild* /*guild*/, std::string const& /*info*/) {}
 };
 
 class MailScript : public ScriptObject

@@ -11755,6 +11755,30 @@ void Unit::RemoveSpellCooldown(uint32 spell_id, bool update)
     }
 }
 
+void Unit::RemoveSpellCooldown(SpellEntry const* spellInfo, bool update)
+{
+    if (spellInfo)
+        RemoveSpellCooldown(spellInfo->Id, update);
+}
+
+void Unit::RemoveSpellCategoryCooldown(uint32 category, bool update)
+{
+    for (auto itr = m_spellCooldowns.begin(); itr != m_spellCooldowns.end();)
+    {
+        if (itr->second.cat != category)
+        {
+            ++itr;
+            continue;
+        }
+
+        uint32 spellId = itr->first;
+        itr = m_spellCooldowns.erase(itr);
+        if (update)
+            if (Player* player = GetAffectingPlayer())
+                player->SendClearCooldown(spellId, this);
+    }
+}
+
 bool Unit::HasSpellCategoryCooldown(uint32 cat) const
 {
     if (!cat)

@@ -50,6 +50,10 @@
 #include <thread>
 #include <any>
 
+#ifdef ENABLE_ELUNA
+#include "ElunaMgr.h"
+#endif
+
 class Object;
 class WorldSession;
 class Player;
@@ -59,6 +63,9 @@ class LoginQueryHolder;
 class BanAccountHandler;
 class World;
 class ChannelBroadcaster;
+#ifdef ENABLE_ELUNA
+class Eluna;
+#endif
 namespace DiscordBot
 {
     class Bot;
@@ -1266,6 +1273,10 @@ class World
         std::atomic_uint64_t m_packetsCount[NUM_MSG_TYPES] = {};
         std::atomic_uint64_t m_packetsSize[NUM_MSG_TYPES] = {};
 
+#ifdef ENABLE_ELUNA
+        Eluna* GetEluna() const { return sElunaMgr->Get(m_elunaInfo); }
+#endif
+
     protected:
         void _UpdateGameTime();
         // callback for UpdateRealmCharacters
@@ -1406,6 +1417,10 @@ class World
         std::unique_ptr<ChannelBroadcaster> m_ChannelBroadcaster;
 
         std::unique_ptr<ThreadPool> m_updateThreads;
+
+#ifdef ENABLE_ELUNA
+        ElunaInfo m_elunaInfo;
+#endif
 };
 
 extern uint32 realmID;

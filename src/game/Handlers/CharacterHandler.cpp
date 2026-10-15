@@ -53,6 +53,9 @@
 #include "Config.hpp"
 #include "Logging/DatabaseLogger.hpp"
 #include <atomic>
+#ifdef ENABLE_ELUNA
+#include "LuaEngine.h"
+#endif
 
 namespace
 {
@@ -911,6 +914,12 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
     {
         script->OnLogin(pCurrChar);
     });
+
+#ifdef ENABLE_ELUNA
+    if (showedIntroCinematic)
+        if (Eluna* e = pCurrChar->GetEluna())
+            e->OnFirstLogin(pCurrChar);
+#endif
 }
 
 void WorldSession::HandleSetFactionAtWarOpcode(WorldPacket & recv_data)
