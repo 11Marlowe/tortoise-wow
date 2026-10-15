@@ -34,6 +34,9 @@
 #include "ScriptObjects.h"
 #include "SpellMgr.h"
 #include "Policies/SingletonImp.h"
+#ifdef ENABLE_ELUNA
+#include "LuaEngine.h"
+#endif
 
 GameEventMgr sGameEventMgr;
 
@@ -98,6 +101,10 @@ void GameEventMgr::StartEvent(uint16 event_id, bool overwrite /*=false*/, bool r
 
     if (GameEventScript* script = ScriptRegistry<GameEventScript>::GetScriptById(event_id))
         script->OnStart(event_id);
+#ifdef ENABLE_ELUNA
+    if (Eluna* e = sWorld.GetEluna())
+        e->OnGameEventStart(event_id);
+#endif
 }
 
 void GameEventMgr::StopEvent(uint16 event_id, bool overwrite)
@@ -117,6 +124,10 @@ void GameEventMgr::StopEvent(uint16 event_id, bool overwrite)
 
     if (GameEventScript* script = ScriptRegistry<GameEventScript>::GetScriptById(event_id))
         script->OnStop(event_id);
+#ifdef ENABLE_ELUNA
+    if (Eluna* e = sWorld.GetEluna())
+        e->OnGameEventStop(event_id);
+#endif
 }
 
 void GameEventMgr::EnableEvent(uint16 event_id, bool enable, bool updateDB)

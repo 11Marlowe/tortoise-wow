@@ -10,7 +10,9 @@
  * from a map thread. Object hooks use the object's map state and run on that
  * map's thread. Packet send/receive hooks are deliberately not bridged: those
  * run on network and async threads. Weather is dispatched from Weather.cpp to
- * the weather's map state, not from here.
+ * the weather's map state, not from here. Game events are dispatched from
+ * GameEventMgr: this core's GameEventScript registry is keyed by script id and
+ * also serves spell and taxi "send event" scripts on map threads.
  */
 
 #ifdef ENABLE_ELUNA
@@ -158,15 +160,6 @@ public:
     void OnLootMoney(Player* player, uint32 gold) override { if (Eluna* e = player->GetEluna()) e->OnLootMoney(player, gold); }
 };
 
-class ElunaGameEventScript final : public GameEventScript
-{
-public:
-    ElunaGameEventScript() : GameEventScript("ElunaGameEventScript") {}
-    bool IsDatabaseBound() const override { return false; }
-    void OnStart(uint16 eventId) override { if (Eluna* e = GetWorldEluna()) e->OnGameEventStart(eventId); }
-    void OnStop(uint16 eventId) override { if (Eluna* e = GetWorldEluna()) e->OnGameEventStop(eventId); }
-};
-
 class ElunaAuctionHouseScript final : public AuctionHouseScript
 {
 public:
@@ -225,7 +218,6 @@ void AddElunaScripts()
     new ElunaGameObjectScript();
     new ElunaItemScript();
     new ElunaLootScript();
-    new ElunaGameEventScript();
     new ElunaAuctionHouseScript();
     new ElunaBattlegroundScript();
     new ElunaGroupScript();

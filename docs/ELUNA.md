@@ -72,7 +72,7 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
 
 - `src/game/ElunaScriptBridge.cpp` registers Eluna with the core's `ScriptObject`
   registries (`WorldScript`, `PlayerScript`, `AllCreatureScript`, `UnitScript`,
-  `AllGameObjectScript`, `AllItemScript`, `LootScript`, `GameEventScript`,
+  `AllGameObjectScript`, `AllItemScript`, `LootScript`,
   `AuctionHouseScript`, `AllBattlegroundScript`, `GroupScript`, `GuildScript`).
 - `ScriptMgr.cpp` hands gossip, quest accept, dialog status, gameobject use,
   area triggers, dummy effects and creature AI to Lua after the C++ scripts.
@@ -80,7 +80,9 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
   world and map state lifecycle (`World.cpp`, `WorldRunnable.cpp`, `Map.cpp`),
   instance data, chat commands, trade, mail, quest abandon, summons, item
   expiry, resurrection, skills, quest status, gameobject state, weather and the
-  per-object Lua event processors (`Object.h/.cpp`).
+  per-object Lua event processors (`Object.h/.cpp`), battleground start/end
+  and game events (`GameEventMgr.cpp`; this core's `GameEventScript` registry
+  is keyed by script id and also serves spell "send event" scripts).
 - `src/game/Eluna/CustomMethods.h` registers `SpellInfo` methods backed by
   `spell_template`.
 
