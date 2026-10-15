@@ -77,6 +77,15 @@ struct ClassDescriptor
 
     // Answer of Unit::IsCaster for classes without special-case rules
     bool casterDefault = false;
+
+    // Creature-type mask (bit = 1 << (CreatureType - 1)): SUMMON_PET pets of
+    // these creature types count as permanent pets of this class, i.e. they
+    // get the pet tab/action-bar spells, are saved for the spirit healer and
+    // count as permanent on mounting.  Empty (default) keeps the vanilla
+    // behavior: only a Warlock's demons are permanent.  Module-provided
+    // classes set this on their descriptor (e.g. undead minions for a
+    // Necromancer).
+    uint32 permanentSummonPetTypes = 0;
 };
 
 // Runtime registry of the classes the core treats as playable, plus their
