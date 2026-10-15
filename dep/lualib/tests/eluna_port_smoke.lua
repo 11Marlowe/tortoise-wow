@@ -16,6 +16,11 @@ It covers, each with a log line starting "ELUNA_SMOKE":
   timed event  CreateLuaEvent: 3 shots, 5 s apart, in every state
   reload       the "loaded" line carries a load counter; ".reload eluna" makes
                every state run the file again
+  game event   GAME_EVENT_START / GAME_EVENT_STOP (34/35): one line per event
+               transition, always in the world state, also when a map script
+               command started or stopped the event
+  dialog       CREATURE_EVENT_ON_DIALOG_STATUS (35) on SMOKE_GOSSIP_ENTRY: a
+               notification only at this Eluna pin (no status is returned)
 ]]
 
 local SMOKE_GOSSIP_ENTRY = 823 -- Deputy Willem, Northshire; change it for another test spot
@@ -80,4 +85,16 @@ RegisterCreatureGossipEvent(SMOKE_GOSSIP_ENTRY, 2, function(event, player, creat
     PrintInfo("ELUNA_SMOKE gossip select sender=" .. sender .. " intid=" .. intid .. " state=" .. state)
     player:SendBroadcastMessage("ELUNA_SMOKE gossip selected " .. intid)
     player:GossipComplete()
+end)
+
+RegisterServerEvent(34, function(event, gameEventId)
+    PrintInfo("ELUNA_SMOKE game event start " .. gameEventId .. " state=" .. state)
+end)
+
+RegisterServerEvent(35, function(event, gameEventId)
+    PrintInfo("ELUNA_SMOKE game event stop " .. gameEventId .. " state=" .. state)
+end)
+
+RegisterCreatureEvent(SMOKE_GOSSIP_ENTRY, 35, function(event, player, creature)
+    PrintInfo("ELUNA_SMOKE dialog status " .. player:GetName() .. " -> " .. creature:GetName() .. " state=" .. state)
 end)

@@ -1279,6 +1279,10 @@ class World
         // instead of entering the world lua_State concurrently.
         Eluna* GetEluna() const;
         void SetElunaWorldThread();
+        // Game events start and stop on the world thread and on map threads;
+        // Eluna's OnGameEventStart/Stop are queued here, in order, and called
+        // from World::Update.
+        void QueueElunaGameEvent(uint16 eventId, bool start);
 #endif
     protected:
         void _UpdateGameTime();
@@ -1425,6 +1429,9 @@ class World
         Eluna* m_eluna = nullptr;
         std::atomic<std::thread::id> m_elunaThread{};
         mutable std::atomic<bool> m_elunaOffThreadLogged{false};
+        std::mutex m_elunaGameEventLock;
+        std::vector<std::pair<uint16, bool>> m_elunaGameEventQueue;
+        void ProcessElunaGameEventQueue();
 #endif
 };
 

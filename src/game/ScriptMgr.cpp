@@ -2271,6 +2271,9 @@ uint32 ScriptMgr::GetDialogStatus(Player* pPlayer, Creature* pCreature)
     }
 
 #ifdef ENABLE_ELUNA
+    // At the pinned Eluna this is a notification: Eluna::GetDialogStatus
+    // returns void and the hook's Lua return values are discarded
+    // (CallAllFunctions), so there is no status to return here.
     if (Eluna* e = pPlayer->GetEluna())
         e->GetDialogStatus(pPlayer, pCreature);
 #endif
@@ -2293,6 +2296,9 @@ uint32 ScriptMgr::GetDialogStatus(Player* pPlayer, GameObject* pGameObject)
         return script->GetDialogStatus(pPlayer, pGameObject);
     }
 #ifdef ENABLE_ELUNA
+    // At the pinned Eluna this is a notification: Eluna::GetDialogStatus
+    // returns void and the hook's Lua return values are discarded
+    // (CallAllFunctions), so there is no status to return here.
     if (Eluna* e = pPlayer->GetEluna())
         e->GetDialogStatus(pPlayer, pGameObject);
 #endif

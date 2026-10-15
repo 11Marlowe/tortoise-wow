@@ -2694,6 +2694,7 @@ void World::Update(uint32 diff)
 #ifdef ENABLE_ELUNA
     // After the async tasks and every map update have finished, so the world
     // state never runs next to them.
+    ProcessElunaGameEventQueue();
     if (Eluna* eluna = GetEluna())
     {
         eluna->UpdateEluna(diff);
@@ -4707,6 +4708,36 @@ Eluna* World::GetEluna() const
     if (!m_elunaOffThreadLogged.exchange(true))
         sLog.outError("Eluna: a hook asked for the world Lua state off the world thread; it was skipped (logged once).");
     return nullptr;
+}
+
+void World::QueueElunaGameEvent(uint16 eventId, bool start)
+{
+    if (!sElunaConfig->IsElunaEnabled())
+        return;
+
+    std::lock_guard<std::mutex> guard(m_elunaGameEventLock);
+    m_elunaGameEventQueue.emplace_back(eventId, start);
+}
+
+void World::ProcessElunaGameEventQueue()
+{
+    std::vector<std::pair<uint16, bool>> queue;
+    {
+        std::lock_guard<std::mutex> guard(m_elunaGameEventLock);
+        queue.swap(m_elunaGameEventQueue);
+    }
+
+    Eluna* eluna = GetEluna();
+    if (!eluna)
+        return;
+
+    for (auto const& entry : queue)
+    {
+        if (entry.second)
+            eluna->OnGameEventStart(entry.first);
+        else
+            eluna->OnGameEventStop(entry.first);
+    }
 }
 
 void World::SetElunaWorldThread()
