@@ -385,13 +385,11 @@ void AddSC_warrior_spell_scripts();
 #ifdef ENABLE_ELUNA
 void AddElunaScripts();
 #endif
-
 void AddScripts()
 {
 #ifdef ENABLE_ELUNA
     AddElunaScripts();
 #endif
-
     //Nostalrius
     AddSC_generic_spell_ai();
 

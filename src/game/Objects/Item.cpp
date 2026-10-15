@@ -1108,6 +1108,7 @@ Item* Item::CreateItem(uint32 item, uint32 count, Player const* player)
     return nullptr;
 }
 
+#ifdef ENABLE_ELUNA
 Item* Item::CreateItem(uint32 item, uint32 count, ObjectGuid ownerGuid)
 {
     if (count < 1)
@@ -1136,7 +1137,7 @@ bool Item::IsNotEmptyBag() const
     Bag const* bag = ToBag();
     return bag && !bag->IsEmpty();
 }
-
+#endif
 Item* Item::CloneItem(uint32 count, Player const* player) const
 {
     Item* newItem = CreateItem(GetEntry(), count, player);

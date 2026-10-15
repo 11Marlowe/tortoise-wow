@@ -40,7 +40,6 @@
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #endif
-
 // Target server framerate is 1000/WORLD_SLEEP_CONST
 #define WORLD_SLEEP_CONST 50
 
@@ -60,8 +59,8 @@ void WorldRunnable::operator()()
     // If we update faster, then slow down!
     uint32 prevTime = WorldTimer::getMSTime();
     uint32 currTime = 0u;
-
 #ifdef ENABLE_ELUNA
+    sWorld.SetElunaWorldThread();
     if (Eluna* eluna = sWorld.GetEluna())
         eluna->OnStartup();
 #endif

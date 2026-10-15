@@ -53,7 +53,6 @@
 #ifdef ENABLE_ELUNA
 #include "ElunaMgr.h"
 #endif
-
 class Object;
 class WorldSession;
 class Player;
@@ -1274,9 +1273,13 @@ class World
         std::atomic_uint64_t m_packetsSize[NUM_MSG_TYPES] = {};
 
 #ifdef ENABLE_ELUNA
-        Eluna* GetEluna() const { return sElunaMgr->Get(m_elunaInfo); }
+        // The world Lua state. It is only handed out on the thread that owns it
+        // (the world thread, or the main thread during startup); any other thread
+        // gets nullptr, so a hook reached from a map or async thread is skipped
+        // instead of entering the world lua_State concurrently.
+        Eluna* GetEluna() const;
+        void SetElunaWorldThread();
 #endif
-
     protected:
         void _UpdateGameTime();
         // callback for UpdateRealmCharacters
@@ -1417,9 +1420,11 @@ class World
         std::unique_ptr<ChannelBroadcaster> m_ChannelBroadcaster;
 
         std::unique_ptr<ThreadPool> m_updateThreads;
-
 #ifdef ENABLE_ELUNA
         ElunaInfo m_elunaInfo;
+        Eluna* m_eluna = nullptr;
+        std::atomic<std::thread::id> m_elunaThread{};
+        mutable std::atomic<bool> m_elunaOffThreadLogged{false};
 #endif
 };
 

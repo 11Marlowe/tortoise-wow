@@ -2179,7 +2179,6 @@ void Spell::EffectSummon(SpellEffectIndex eff_idx)
         if (Eluna* e = m_casterUnit->GetEluna())
             e->OnSummoned(spawnCreature, m_casterUnit);
 #endif
-
         return;
     }
 
@@ -2244,7 +2243,6 @@ void Spell::EffectSummon(SpellEffectIndex eff_idx)
 
     if (m_spellScript)
         m_spellScript->OnSummon(this, spawnCreature);
-
 #ifdef ENABLE_ELUNA
     if (Eluna* e = m_casterUnit->GetEluna())
         e->OnSummoned(spawnCreature, m_casterUnit);
@@ -2714,7 +2712,6 @@ void Spell::EffectSummonGuardian(SpellEffectIndex eff_idx)
 
         if (m_spellScript)
             m_spellScript->OnSummon(this, spawnCreature);
-
 #ifdef ENABLE_ELUNA
         if (Eluna* e = m_casterUnit->GetEluna())
             e->OnSummoned(spawnCreature, m_casterUnit);
@@ -2743,7 +2740,6 @@ void Spell::EffectSummonPossessed(SpellEffectIndex eff_idx)
 
     if (m_spellScript)
         m_spellScript->OnSummon(this, pMinion);
-
 #ifdef ENABLE_ELUNA
     if (Eluna* e = pCaster->GetEluna())
         e->OnSummoned(pMinion, pCaster);
@@ -5147,7 +5143,6 @@ void Spell::EffectSummonCritter(SpellEffectIndex eff_idx)
 
     if (m_spellScript)
         m_spellScript->OnSummon(this, critter);
-
 #ifdef ENABLE_ELUNA
     if (Eluna* e = player->GetEluna())
         e->OnSummoned(critter, player);

@@ -273,11 +273,12 @@ void Creature::RemoveFromWorld()
     ///- Remove the creature from the accessor
     if (IsInWorld())
     {
+#ifdef ENABLE_ELUNA
         ScriptRegistry<AllCreatureScript>::ForEach([&](AllCreatureScript* script)
         {
             script->OnCreatureRemoveWorld(this);
         });
-
+#endif
         if (AI())
             AI()->OnRemoveFromWorld();
         if (GetObjectGuid().GetHigh() == HIGHGUID_UNIT)
@@ -702,11 +703,12 @@ void Creature::Update(uint32 update_diff, uint32 diff)
 {
     update_diff *= sWorld.GetTimeRate();
     diff *= sWorld.GetTimeRate();
-
+#ifdef ENABLE_ELUNA
     ScriptRegistry<AllCreatureScript>::ForEach([&](AllCreatureScript* script)
     {
         script->OnAllCreatureUpdate(this, update_diff);
     });
+#endif
 
     // AI was locked and switch was delayed to next update.
     if (HasCreatureState(CSTATE_INIT_AI_ON_UPDATE))

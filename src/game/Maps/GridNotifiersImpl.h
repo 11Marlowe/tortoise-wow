@@ -356,6 +356,7 @@ void MaNGOS::WorldObjectListSearcher<Check>::Visit(PlayerMapType& m)
 }
 
 template<class Check>
+#ifdef ENABLE_ELUNA
 void MaNGOS::WorldObjectLastSearcher<Check>::Visit(GameObjectMapType& m)
 {
     for (auto& entry : m)
@@ -396,6 +397,7 @@ void MaNGOS::WorldObjectLastSearcher<Check>::Visit(DynamicObjectMapType& m)
 }
 
 template<class Check>
+#endif
 void MaNGOS::WorldObjectListSearcher<Check>::Visit(CreatureMapType& m)
 {
     for(auto & itr : m)

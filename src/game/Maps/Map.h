@@ -46,7 +46,6 @@
 #include "LuaValue.h"
 #include "ElunaMgr.h"
 #endif
-
 #include <bitset>
 #include <list>
 #include <set>
@@ -626,10 +625,12 @@ class Map : public GridRefManager<NGridType>
         void ScheduleCorpseRemoval();
 
 #ifdef ENABLE_ELUNA
-        Eluna* GetEluna() const { return sElunaMgr->Get(m_elunaInfo); }
+        // Cached when the map is made: the ElunaMgr container is not read from
+        // map threads, so one map being made or destroyed never races another
+        // map's lookup.
+        Eluna* GetEluna() const { return m_eluna; }
         LuaVal lua_data = LuaVal({});
 #endif
-
         XStatTimer MovementPerfTimer;
         XStatTimer SpellPerfTimer;
         XStatTimer UpdateTimer;
@@ -990,10 +991,10 @@ class Map : public GridRefManager<NGridType>
     public:
         CreatureGroupHolderType CreatureGroupHolder;
         uint32 GetLastPlayerLeftTime() const { return _lastPlayerLeftTime; }
-
-    private:
 #ifdef ENABLE_ELUNA
+    private:
         ElunaInfo m_elunaInfo;
+        Eluna* m_eluna = nullptr;
 #endif
 };
 

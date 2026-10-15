@@ -234,6 +234,7 @@ namespace MaNGOS
         void Visit(DynamicObjectMapType &m);
 
         template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED> &) {}
+#ifdef ENABLE_ELUNA
     };
 
     // Last object accepted by Check. Checks may narrow their range after each
@@ -253,6 +254,7 @@ namespace MaNGOS
         void Visit(DynamicObjectMapType& m);
 
         template<class NOT_INTERESTED> void Visit(GridRefManager<NOT_INTERESTED>&) {}
+#endif
     };
 
     template<class Do>

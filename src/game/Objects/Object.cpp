@@ -57,7 +57,6 @@
 #include "packet_builder.h"
 #include "MovementBroadcaster.h"
 #include "PlayerBroadcaster.h"
-
 #ifdef ENABLE_ELUNA
 #include "LuaEngine.h"
 #include "ElunaEventMgr.h"
@@ -2240,7 +2239,6 @@ Creature* WorldObject::SummonCreature(uint32 id, float x, float y, float z, floa
 
     if (GetTypeId() == TYPEID_UNIT && ((Creature*)this)->AI())
         ((Creature*)this)->AI()->JustSummoned(pCreature);
-
 #ifdef ENABLE_ELUNA
     if (Unit* summoner = ToUnit())
         if (Eluna* e = GetEluna())
@@ -5301,7 +5299,6 @@ ElunaEventProcessor* WorldObject::GetElunaEvents(int32 mapId)
     return eventMgr->GetObjectProcessor(info->GetProcessorId());
 }
 #endif
-
 void WorldObject::MoveChannelledSpellWithCastTime(Spell* pSpell)
 {
     MANGOS_ASSERT(pSpell);

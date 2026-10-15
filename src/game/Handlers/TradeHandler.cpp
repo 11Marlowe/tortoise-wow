@@ -384,7 +384,6 @@ void WorldSession::HandleAcceptTradeOpcode(WorldPacket& recvPacket)
         }
     }
 #endif
-
     if (his_trade->IsAccepted())
     {
         setAcceptTradeMode(my_trade, his_trade, myItems, hisItems);
@@ -723,7 +722,6 @@ void WorldSession::HandleInitiateTradeOpcode(WorldPacket& recvPacket)
         }
     }
 #endif
-
     // OK start trade
     _player->m_trade = new TradeData(_player, pOther);
     pOther->m_trade = new TradeData(pOther, _player);

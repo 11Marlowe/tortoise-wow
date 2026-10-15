@@ -1259,7 +1259,6 @@ uint32 Player::EnvironmentalDamage(EnvironmentalDamageType type, uint32 damage)
     SendEnvironmentalDamageLog(type, damage, absorb, resist);
 
     damage = DealDamage(this, damage, nullptr, SELF_DAMAGE, SPELL_SCHOOL_MASK_NORMAL, nullptr, false);
-
 #ifdef ENABLE_ELUNA
     if (!IsAlive())
         if (Eluna* e = GetEluna())
@@ -5868,7 +5867,6 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness, bool for
     if (Eluna* e = GetEluna())
         e->OnResurrect(this);
 #endif
-
     if (!applySickness)
         return;
 
@@ -7968,9 +7966,11 @@ void Player::RewardReputation(Unit *pVictim, float rate)
     // World of Warcraft Client Patch 1.10.0 (2006-03-28)
     // - Pets no longer modify your reputation if you kill them.
     if (pVictim->IsPet())
+#ifdef ENABLE_ELUNA
         return;
 
     if (static_cast<Creature*>(pVictim)->IsReputationGainDisabled())
+#endif
         return;
 
     ReputationOnKillEntry const* Rep = sObjectMgr.GetReputationOnKillEntry(((Creature*)pVictim)->GetEntry());
@@ -15848,7 +15848,6 @@ void Player::SetQuestStatus(uint32 quest_id, QuestStatus status)
 
         UpdateForQuestWorldObjects();
     }
-
 #ifdef ENABLE_ELUNA
     if (Eluna* e = GetEluna())
         e->OnQuestStatusChanged(this, quest_id, status);

@@ -11755,6 +11755,7 @@ void Unit::RemoveSpellCooldown(uint32 spell_id, bool update)
     }
 }
 
+#ifdef ENABLE_ELUNA
 void Unit::RemoveSpellCooldown(SpellEntry const* spellInfo, bool update)
 {
     if (spellInfo)
@@ -11778,7 +11779,7 @@ void Unit::RemoveSpellCategoryCooldown(uint32 category, bool update)
                 player->SendClearCooldown(spellId, this);
     }
 }
-
+#endif
 bool Unit::HasSpellCategoryCooldown(uint32 cat) const
 {
     if (!cat)

@@ -914,7 +914,6 @@ void WorldSession::HandlePlayerLogin(LoginQueryHolder *holder)
     {
         script->OnLogin(pCurrChar);
     });
-
 #ifdef ENABLE_ELUNA
     if (showedIntroCinematic)
         if (Eluna* e = pCurrChar->GetEluna())

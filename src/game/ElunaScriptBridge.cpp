@@ -2,6 +2,15 @@
  * Bridges Turtle WoW's ScriptObject event bus to Eluna.  Map lifecycle and
  * world update hooks are wired directly in Map/World because those calls also
  * own the per-map Lua state lifetime.
+ *
+ * Originally written by Nighthawk42 for TuringKi/turtle-wow-custom (aa0b2be).
+ *
+ * Threading: hooks that use GetWorldEluna() get nullptr off the world thread
+ * (World::GetEluna), so they are skipped rather than entering the world state
+ * from a map thread. Object hooks use the object's map state and run on that
+ * map's thread. Packet send/receive hooks are deliberately not bridged: those
+ * run on network and async threads. Weather is dispatched from Weather.cpp to
+ * the weather's map state, not from here.
  */
 
 #ifdef ENABLE_ELUNA
@@ -16,6 +25,7 @@
 #include "Guild.h"
 #include "Item.h"
 #include "LuaEngine.h"
+#include "ElunaConfig.h"
 #include "Player.h"
 #include "Weather.h"
 #include "World.h"
@@ -148,39 +158,11 @@ public:
     void OnItemRemove(Player* player, Item* item) override { if (Eluna* e = player->GetEluna()) e->OnRemove(player, item); }
 };
 
-class ElunaServerScript final : public ServerScript
-{
-public:
-    ElunaServerScript() : ServerScript("ElunaServerScript") {}
-    bool CanPacketSend(WorldSession* session, WorldPacket const& packet) override
-    {
-        Eluna* e = session && session->GetPlayer() ? session->GetPlayer()->GetEluna() : GetWorldEluna();
-        return !e || e->OnPacketSend(session, packet);
-    }
-    bool CanPacketReceive(WorldSession* session, WorldPacket const& packet) override
-    {
-        Eluna* e = session && session->GetPlayer() ? session->GetPlayer()->GetEluna() : GetWorldEluna();
-        return !e || e->OnPacketReceive(session, const_cast<WorldPacket&>(packet));
-    }
-};
-
 class ElunaLootScript final : public LootScript
 {
 public:
     ElunaLootScript() : LootScript("ElunaLootScript") {}
     void OnLootMoney(Player* player, uint32 gold) override { if (Eluna* e = player->GetEluna()) e->OnLootMoney(player, gold); }
-};
-
-class ElunaWeatherScript final : public WeatherScript
-{
-public:
-    ElunaWeatherScript() : WeatherScript("ElunaWeatherScript") {}
-    bool IsDatabaseBound() const override { return false; }
-    void OnChange(Weather* weather, uint32 state, float grade) override
-    {
-        if (Eluna* e = GetWorldEluna())
-            e->OnChange(weather, weather->GetZone(), static_cast<WeatherState>(state), grade);
-    }
 };
 
 class ElunaGameEventScript final : public GameEventScript
@@ -238,15 +220,18 @@ public:
 
 void AddElunaScripts()
 {
+    // Eluna.Enabled = 0: no bridge scripts, so the registries dispatch exactly
+    // as in a build without Eluna.
+    if (!sElunaConfig->IsElunaEnabled())
+        return;
+
     new ElunaWorldScript();
     new ElunaPlayerScript();
     new ElunaCreatureScript();
     new ElunaUnitScript();
     new ElunaGameObjectScript();
     new ElunaItemScript();
-    new ElunaServerScript();
     new ElunaLootScript();
-    new ElunaWeatherScript();
     new ElunaGameEventScript();
     new ElunaAuctionHouseScript();
     new ElunaBattlegroundScript();

@@ -438,7 +438,6 @@ void WorldSession::HandleSendMailCallback(WorldSession::AsyncMailSendRequest* re
         return;
     }
     data.JustMailed(rc_account);
-
 #ifdef ENABLE_ELUNA
     if (Eluna* e = loadedPlayer->GetEluna())
     {

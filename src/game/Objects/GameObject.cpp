@@ -43,7 +43,9 @@
 #include "Geometry.h"
 #include "GameObjectAI.h"
 #include "ScriptMgr.h"
+#ifdef ENABLE_ELUNA
 #include "ScriptObjects.h"
+#endif
 #include "ZoneScript.h"
 #include "DynamicTree.h"
 #include "vmap/GameObjectModel.h"
@@ -56,8 +58,10 @@
 #include <G3D/Quat.h>
 #include "SuspiciousStatisticMgr.h"
 #include "PerfStats.h"
+#ifdef ENABLE_ELUNA
 #include "Group.h"
 #include "ObjectAccessor.h"
+#endif
 
 bool QuaternionData::isUnit() const
 {
@@ -122,6 +126,7 @@ GameObject::~GameObject()
     --PerfStats::g_totalGameObjects;
 }
 
+#ifdef ENABLE_ELUNA
 Group* GameObject::GetGroupLootRecipient() const
 {
     return m_playerGroupId ? sObjectMgr.GetGroupById(m_playerGroupId) : nullptr;
@@ -140,7 +145,7 @@ Player* GameObject::GetLootRecipient() const
 
     return nullptr;
 }
-
+#endif
 bool CanOnlyBeLootedByPlayersOnMapAtSpawn(uint32 entry)
 {
     switch (entry)
@@ -155,8 +160,9 @@ bool CanOnlyBeLootedByPlayersOnMapAtSpawn(uint32 entry)
 
 void GameObject::AddToWorld()
 {
+#ifdef ENABLE_ELUNA
     bool const wasInWorld = IsInWorld();
-
+#endif
     ///- Register the gameobject for guid lookup
     if (!IsInWorld())
     {
@@ -174,12 +180,13 @@ void GameObject::AddToWorld()
 
     if (!i_AI)
         AIM_Initialize();
-
+#ifdef ENABLE_ELUNA
     if (!wasInWorld && IsInWorld())
         ScriptRegistry<AllGameObjectScript>::ForEach([&](AllGameObjectScript* script)
         {
             script->OnGameObjectAddWorld(this);
         });
+#endif
 
     if (CanOnlyBeLootedByPlayersOnMapAtSpawn(GetEntry()))
     {
@@ -204,11 +211,12 @@ void GameObject::RemoveFromWorld()
     ///- Remove the gameobject from the accessor
     if (IsInWorld())
     {
+#ifdef ENABLE_ELUNA
         ScriptRegistry<AllGameObjectScript>::ForEach([&](AllGameObjectScript* script)
         {
             script->OnGameObjectRemoveWorld(this);
         });
-
+#endif
         if (m_zoneScript)
             m_zoneScript->OnGameObjectRemove(this);
 
@@ -316,7 +324,6 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
     if (Eluna* e = GetEluna())
         e->OnSpawn(this);
 #endif
-
     return true;
 }
 
@@ -379,11 +386,12 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
     ///- UpdateAI
     if (i_AI)
         i_AI->UpdateAI(update_diff);
-
+#ifdef ENABLE_ELUNA
     ScriptRegistry<AllGameObjectScript>::ForEach([&](AllGameObjectScript* script)
     {
         script->OnGameObjectUpdate(this, update_diff);
     });
+#endif
 
     switch (m_lootState)
     {
