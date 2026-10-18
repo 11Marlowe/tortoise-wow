@@ -183,7 +183,7 @@ struct CreatureDisplayInfoExtraEntry
 {
     uint32      DisplayExtraId;                             // 0        m_ID CreatureDisplayInfoEntry::m_extendedDisplayInfoID
     uint32      Race;                                       // 1        m_DisplayRaceID
-    //uint32    Gender;                                     // 2        m_DisplaySexID
+    uint32      Gender;                                     // 2        m_DisplaySexID (0 male, 1 female; character-model NPCs)
     //uint32    SkinColor;                                  // 3        m_SkinID
     //uint32    FaceType;                                   // 4        m_FaceID
     //uint32    HairType;                                   // 5        m_HairStyleID
