@@ -418,6 +418,14 @@ bool Transport::TeleportTransport(uint32 newMapid, float x, float y, float z, fl
         for (auto const& pMap : m_maps)
             pMap->Add<Transport>(this);
     }
+    else
+    {
+        // The client stops showing a transport after a while out of view, and
+        // shows it again only after an out-of-range update and a create update
+        // for it, so send both on a teleport within the map too.
+        SendOutOfRangeUpdateToMap();
+        SendCreateUpdateToMap();
+    }
 
     // set the instance at these coordinates as the main one
     SetLocationInstanceId(newInstanceId);

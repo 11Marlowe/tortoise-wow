@@ -331,8 +331,10 @@ void TransportMgr::GeneratePath(GameObjectInfo const* goInfo, TransportTemplate*
 
     keyFrames.back().NextArriveTime = keyFrames.back().DepartureTime;
     // the client destroys a transport by itself after a while, refresh is needed mid course
-    // Feathermoon 303 & Teldrassil 293 ferries
-    if (pathId == 303 || pathId == 293)
+    // Paths `117` and `122` are the Rut'theran Village to Auberdine and
+    // Feathermoon Stronghold to Forgotten Coast ships, and `295` is the
+    // Orgrimmar to Thunder Bluff zeppelin.
+    if (pathId == 117 || pathId == 122 || pathId == 295)
         keyFrames[12].Update = true;
     // hack for custom boats:
     if ((pathId == 1500))
