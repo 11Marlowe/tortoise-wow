@@ -29,7 +29,9 @@ cmake --build build --target mangosd
   (`git apply`, or `patch`) and the build compiles that copy. `git apply` is
   kept from treating the copy as part of the core's checkout (a build directory
   inside it, `cmake -B build`, would otherwise make it skip every file and
-  still succeed). After applying, CMake checks every patch is in the copy (it
+  still succeed; a build path with a `:` in it breaks that guard, which then
+  ends in a CMake error, not a silent pass). Without git, `patch -p1
+  --fuzz=0` is used. After applying, CMake checks every patch is in the copy (it
   reverses cleanly and its `ELUNA_TW_PATCH_<n>` marker is there) and stops if a
   patch does not apply or is missing (after a submodule bump, refresh the
   patches); the checks run on every configure and remake a copy that lacks a

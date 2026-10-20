@@ -70,11 +70,16 @@ function(eluna_patch_tool mode patch result_var output_var)
       OUTPUT_VARIABLE output
       ERROR_VARIABLE output)
   else()
-    set(patch_args -p1 --batch -i "${patch}")
+    # --fuzz=0: a hunk lands only where its context matches exactly (not
+    # somewhere nearby after a submodule bump). Verify uses --force, not
+    # --batch: with --batch a patch that is NOT applied gives "Unreversed patch
+    # detected!  Ignoring -R." and exits 0; --force never asks and assumes the
+    # patch is not reversed, so reversing an absent patch fails its hunks.
+    set(patch_args -p1 --fuzz=0 -i "${patch}")
     if(mode STREQUAL "verify")
-      list(APPEND patch_args -R --dry-run)
+      list(APPEND patch_args -R --dry-run --force)
     else()
-      list(APPEND patch_args --forward)
+      list(APPEND patch_args --forward --batch)
     endif()
     execute_process(
       COMMAND "${ELUNA_PATCH_EXECUTABLE}" ${patch_args}
@@ -83,7 +88,9 @@ function(eluna_patch_tool mode patch result_var output_var)
       OUTPUT_VARIABLE output
       ERROR_VARIABLE output)
   endif()
-  if(result EQUAL 0 AND output MATCHES "Skipped patch|Reversed .*patch detected")
+  # Any of these means the patch was not (or not wholly) applied or present,
+  # whatever the exit code.
+  if(result EQUAL 0 AND output MATCHES "Skipped patch|[Uu]nreversed patch|Ignoring -R|[Rr]eversed \\(or previously applied\\)|FAILED|[Ff]uzz [1-9]")
     set(result 1)
   endif()
   # git -v names every file it checks: no "Checking patch" means it did nothing.
