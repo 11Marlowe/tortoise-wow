@@ -1,3 +1,10 @@
+tortoise-wow: a map's Lua state refuses objects of another map (VMaNGOS has no trackable pointers, so no BoundMap check).
+
+Base: ElunaLuaEngine/Eluna 1b06f28ff3a00054d915d824c725fb4283fee74d (branch
+cmangos-spell-update), the dep/Eluna pin. Eluna is GPL-3.0
+(https://github.com/ElunaLuaEngine/Eluna, LICENSE); this change is under the
+same licence. Applied by cmake/ElunaSources.cmake to a copy in the build tree.
+VMaNGOS-specific (other cores have trackable pointers); upstream would need it as a VMaNGOS option.
 diff --git a/ElunaTemplate.cpp b/ElunaTemplate.cpp
 index ff50591..a440645 100644
 --- a/ElunaTemplate.cpp
@@ -33,10 +40,20 @@ index ff50591..a440645 100644
 +}
 +#endif
 diff --git a/ElunaTemplate.h b/ElunaTemplate.h
-index 6b4f036..a4440da 100644
+index 6b4f036..ea1be94 100644
 --- a/ElunaTemplate.h
 +++ b/ElunaTemplate.h
-@@ -44,6 +44,9 @@ public:
+@@ -7,6 +7,9 @@
+ #ifndef _ELUNA_TEMPLATE_H
+ #define _ELUNA_TEMPLATE_H
+ 
++// tortoise-wow dep/eluna-patches/0002 is applied (checked by the core).
++#define ELUNA_TW_PATCH_0002 1
++
+ extern "C"
+ {
+ #include "lua.h"
+@@ -44,6 +47,9 @@ public:
      virtual void* GetObjIfValid() const = 0;
      // Returns pointer to the wrapped object's type name
      const char* GetTypeName() const { return type_name; }
@@ -46,7 +63,7 @@ index 6b4f036..a4440da 100644
  #if !defined TRACKABLE_PTR_NAMESPACE
      // Invalidates the pointer if it should be invalidated
      virtual void Invalidate() = 0;
-@@ -87,6 +90,39 @@ ElunaConstrainedObjectRef<T> GetWeakPtrFor(T const* obj)
+@@ -87,6 +93,39 @@ ElunaConstrainedObjectRef<T> GetWeakPtrFor(T const* obj)
  
  #endif
  
@@ -86,7 +103,7 @@ index 6b4f036..a4440da 100644
  template <typename T>
  class ElunaObjectImpl : public ElunaObject
  {
-@@ -106,17 +142,29 @@ public:
+@@ -106,17 +145,29 @@ public:
      }
  #else
      ElunaObjectImpl(Eluna* E, T* obj, char const* tname) : ElunaObject(E, tname), _obj(obj), callstackid(E->GetCallstackId())
@@ -117,7 +134,7 @@ index 6b4f036..a4440da 100644
      void Invalidate() override { callstackid = 1; }
  #endif
  
-@@ -126,6 +174,9 @@ private:
+@@ -126,6 +177,9 @@ private:
  #else
      void* _obj;
      uint64 callstackid;
@@ -127,7 +144,7 @@ index 6b4f036..a4440da 100644
  #endif
  };
  
-@@ -423,7 +474,10 @@ public:
+@@ -423,7 +477,10 @@ public:
          if (!obj)
          {
              char buff[256];

@@ -20,8 +20,9 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      "2 own" for players on the state's map, never "2 FAIL".
 
   3  instance data survives a restart
-     Set SMOKE_INSTANCE_MAP to a dungeon WITHOUT a C++ instance script
-     (`SELECT entry FROM map_template WHERE script_name = ''`). Enter it,
+     SMOKE_INSTANCE_MAP must be a dungeon WITHOUT a C++ instance script; the
+     default, 34 (The Stockade), has none in src/scripts (389, Ragefire
+     Chasm, neither; 36, Deadmines, has one). Enter it,
      wait for "3 saved counter=N", restart mangosd within the instance's
      reset time, enter the same instance again.
      Expect "3 loaded counter=N" (not 0), and "3 saved counter=N+1".
@@ -42,7 +43,7 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      or loot a herb and wait for its respawn): expect "5 gameobject spawn".
 ]]
 
-local SMOKE_INSTANCE_MAP = 36       -- change to a dungeon without a C++ instance script
+local SMOKE_INSTANCE_MAP = 34       -- The Stockade: no C++ instance script in src/scripts (nor Ragefire Chasm, 389)
 local SMOKE_CREATURE_ENTRY = 6      -- Kobold Vermin, Northshire
 local SMOKE_GO_ENTRY = 1618         -- Peacebloom
 local SMOKE_RELOAD_EVERY_MS = 0     -- > 0: the world state reloads Eluna this often
@@ -72,10 +73,19 @@ local function startPlayerTimer(player)
     local name = player:GetName()
     player:RegisterEvent(function(eventId, delay, repeats, obj)
         -- obj is the player; the timer runs in the state that registered it.
-        log("1", "timer " .. obj:GetName() .. " on map " .. obj:GetMapId())
-        if obj:GetMapId() ~= stateMapId and stateMapId ~= -1 then
-            log("1", "FAIL timer of map " .. stateMapId .. " ran for a player on map " .. obj:GetMapId())
+        -- A timer of the old map running for a player now on another map is
+        -- the regression; with the cross-map refusal (item 2) using obj then
+        -- raises "another map", so the error itself is reported as FAIL.
+        local ok, mapId = pcall(function() return obj:GetMapId() end)
+        if not ok then
+            log("1", "FAIL timer of map " .. stateMapId .. " ran for a player it cannot use: " .. tostring(mapId))
+            return
         end
+        if stateMapId ~= -1 and mapId ~= stateMapId then
+            log("1", "FAIL timer of map " .. stateMapId .. " ran for a player on map " .. mapId)
+            return
+        end
+        log("1", "timer " .. name .. " on map " .. mapId)
     end, 5000, 0)
     log("1", "registered timer for " .. name)
 end

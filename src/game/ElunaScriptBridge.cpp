@@ -33,6 +33,18 @@
 #include "World.h"
 #include "WorldSession.h"
 
+// The game library compiles a copy of dep/Eluna with dep/eluna-patches applied
+// (cmake/ElunaSources.cmake). Each patch defines a marker; an unpatched copy
+// stops the build here instead of compiling an engine without the fixes.
+#include "BasicAI.h"
+#include "ElunaEventMgr.h"
+#include "ElunaTemplate.h"
+#include "ElunaInstanceAI.h"
+#include "ElunaCreatureAI.h"
+#if !defined ELUNA_TW_PATCH_0001 || !defined ELUNA_TW_PATCH_0002 || !defined ELUNA_TW_PATCH_0003 || !defined ELUNA_TW_PATCH_0004
+#error "Eluna is compiled without dep/eluna-patches: re-run CMake (cmake/ElunaSources.cmake makes the patched copy)."
+#endif
+
 namespace
 {
 Eluna* GetWorldEluna()

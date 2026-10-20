@@ -1,3 +1,10 @@
+tortoise-wow: EventMgr::CreateObjectProcessor replaces a processor that is flagged for deletion instead of destroying the new one while it is still listed (use after free).
+
+Base: ElunaLuaEngine/Eluna 1b06f28ff3a00054d915d824c725fb4283fee74d (branch
+cmangos-spell-update), the dep/Eluna pin. Eluna is GPL-3.0
+(https://github.com/ElunaLuaEngine/Eluna, LICENSE); this change is under the
+same licence. Applied by cmake/ElunaSources.cmake to a copy in the build tree.
+Candidate to upstream to Eluna.
 diff --git a/ElunaEventMgr.cpp b/ElunaEventMgr.cpp
 index 2dd0c5f..9fe50d4 100644
 --- a/ElunaEventMgr.cpp
@@ -42,10 +49,20 @@ index 2dd0c5f..9fe50d4 100644
 +    replacedObjectProcessors.clear();
  }
 diff --git a/ElunaEventMgr.h b/ElunaEventMgr.h
-index e28cd40..f010a3b 100644
+index e28cd40..c0b3821 100644
 --- a/ElunaEventMgr.h
 +++ b/ElunaEventMgr.h
-@@ -160,6 +160,10 @@ private:
+@@ -7,6 +7,9 @@
+ #ifndef _ELUNA_EVENT_MGR_H
+ #define _ELUNA_EVENT_MGR_H
+ 
++// tortoise-wow dep/eluna-patches/0001 is applied (checked by the core).
++#define ELUNA_TW_PATCH_0001 1
++
+ #include "ElunaUtility.h"
+ #include "Common.h"
+ #if defined ELUNA_TRINITY
+@@ -160,6 +163,10 @@ private:
      GlobalProcessorsMap globalProcessors;
      ObjectProcessorMap objectProcessors;
      std::unordered_set<uint64> objectProcessorsPendingDelete;

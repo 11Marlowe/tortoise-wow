@@ -26,9 +26,18 @@ cmake --build build --target mangosd
 - The submodule stays pristine. The fixes this core needs in Eluna are the
   patch files in `dep/eluna-patches`; `cmake/ElunaSources.cmake` copies
   `dep/Eluna` to `<build>/dep/eluna-src`, applies the patches in name order
-  (`git apply`, or `patch`) and the build compiles that copy. CMake stops if a
-  patch does not apply (after a submodule bump, refresh the patches). The copy
-  is remade only when a submodule file or a patch changes.
+  (`git apply`, or `patch`) and the build compiles that copy. `git apply` is
+  kept from treating the copy as part of the core's checkout (a build directory
+  inside it, `cmake -B build`, would otherwise make it skip every file and
+  still succeed). After applying, CMake checks every patch is in the copy (it
+  reverses cleanly and its `ELUNA_TW_PATCH_<n>` marker is there) and stops if a
+  patch does not apply or is missing (after a submodule bump, refresh the
+  patches); the checks run on every configure and remake a copy that lacks a
+  patch. `src/game/ElunaScriptBridge.cpp` also fails to compile (`#error`)
+  without the four markers. The copy is remade when a submodule file, a patch
+  or `ElunaSources.cmake` changes. Each patch names its Eluna base commit;
+  0001, 0003 and 0004 are candidates to upstream to Eluna, 0002 is
+  VMaNGOS-specific (other cores get the check from trackable pointers).
 
   | Patch | Fixes |
   | --- | --- |
@@ -98,8 +107,11 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
   on it, with the Lua error "... got an object on another map ...: refused".
   `GetPlayerByGUID`, `GetPlayerByName` and `GetPlayersInWorld` still return such
   players; scripts can test them with `pcall`. The world state may use objects
-  of any map: it only runs while no map updates. Groups and guilds are not
-  bound to a map and are not checked.
+  of any map: it only runs while no map updates. Not checked: groups and
+  guilds are not bound to a map, so in a map state their methods can still
+  reach players on other maps (`SendPacket` to the members, member and leader
+  changes); `Spell`, `Aura` and `BattleGround` userdata are not checked either
+  (they are only pushed by hooks on their own map).
 - **Timed events of objects** (`obj:RegisterEvent`). An object's events live in
   the event manager of the state that registered them, and only the state of
   the object's own map can register map events on it. The object never keeps a
@@ -181,3 +193,5 @@ destroyed, after its objects are unloaded.
 - A ThreadSanitizer run.
 - Tick-time numbers: built without Eluna, Eluna disabled, Eluna enabled.
 - A Windows/MSVC build.
+- Patch application on Windows: the patch files are LF (`.gitattributes` keeps
+  them LF in a checkout); not tried with Git for Windows.
