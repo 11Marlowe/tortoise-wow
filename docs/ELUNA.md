@@ -196,4 +196,10 @@ destroyed, after its objects are unloaded.
 - Tick-time numbers: built without Eluna, Eluna disabled, Eluna enabled.
 - A Windows/MSVC build.
 - Patch application on Windows: the patch files are LF (`.gitattributes` keeps
-  them LF in a checkout); not tried with Git for Windows.
+  them LF in a checkout). The apply and verify commands were run (ported to
+  PowerShell, CMake itself was not run) with Git for Windows 2.55 on CRLF
+  sources: they work with the default `core.autocrlf=true` and with the
+  `patch.exe` fallback. With `core.autocrlf=false` and CRLF sources, `git apply`
+  cannot match the LF patches: configure stops with "does not apply" and the
+  copy is removed, it never builds unpatched. Use `core.autocrlf=true` (the Git
+  for Windows default) or check out `dep/Eluna` with LF endings.
