@@ -46,10 +46,8 @@ set(ELUNA_LUA_VERSION "lua52" CACHE STRING "Lua runtime used by Eluna (lua51, lu
 set_property(CACHE ELUNA_LUA_VERSION PROPERTY STRINGS lua51 lua52 lua53 lua54)
 
 if(BUILD_ELUNA)
-  if(NOT EXISTS "${CMAKE_SOURCE_DIR}/src/modules/Eluna/LuaEngine.h")
-    message(FATAL_ERROR
-      "Eluna submodule is missing. Run: git submodule update --init --recursive src/modules/Eluna")
-  endif()
+  # dep/Eluna (submodule) + dep/eluna-patches -> ELUNA_SOURCE_DIR in the build tree.
+  include(${CMAKE_SOURCE_DIR}/cmake/ElunaSources.cmake)
   if(BUILD_ELUNA_TESTS)
     enable_testing()
   endif()

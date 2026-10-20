@@ -57,7 +57,7 @@ The optional Eluna integration is built on the port by **Nighthawk42** and **Nig
 [TuringKi/turtle-wow-custom][6] (commits `aa0b2be`, `e649428`, `bdbe530`): the build plumbing, the
 `ElunaScriptBridge.cpp` hook bridge, the core hook sites and the `SpellInfo` compatibility layer in
 `src/game/Eluna/CustomMethods.h`. The engine itself is [Eluna][7] (GPL-3.0), pinned as the
-`src/modules/Eluna` submodule; Lua is MIT-licensed.
+`dep/Eluna` submodule (with the core's fixes in `dep/eluna-patches`); Lua is MIT-licensed.
 
 ## Notes
 

@@ -517,26 +517,26 @@ if(BUILD_ELUNA)
   )
 
   file(GLOB ELUNA_SRCS CONFIGURE_DEPENDS
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/*.h
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks/*.h
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/methods/*.cpp
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/methods/VMangos/*.h
+    ${ELUNA_SOURCE_DIR}/*.cpp
+    ${ELUNA_SOURCE_DIR}/*.h
+    ${ELUNA_SOURCE_DIR}/hooks/*.cpp
+    ${ELUNA_SOURCE_DIR}/hooks/*.h
+    ${ELUNA_SOURCE_DIR}/methods/*.cpp
+    ${ELUNA_SOURCE_DIR}/methods/VMangos/*.h
   )
 
   if(MSVC)
     # Eluna's parameter-pack name `Is` conflicts with its LuaRet<T>::Is
     # predicate in current MSVC. Build a generated, semantically identical
-    # copy so the pinned submodule remains pristine.
+    # copy of the two files.
     set(ELUNA_MSVC_SOURCE_DIR ${CMAKE_CURRENT_BINARY_DIR}/eluna-msvc)
     file(MAKE_DIRECTORY ${ELUNA_MSVC_SOURCE_DIR})
     configure_file(
-      ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks/SpellHooks.cpp
+      ${ELUNA_SOURCE_DIR}/hooks/SpellHooks.cpp
       ${ELUNA_MSVC_SOURCE_DIR}/SpellHooks.cpp
       COPYONLY
     )
-    file(READ ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks/HookHelpers.h ELUNA_HOOK_HELPERS)
+    file(READ ${ELUNA_SOURCE_DIR}/hooks/HookHelpers.h ELUNA_HOOK_HELPERS)
     string(FIND "${ELUNA_HOOK_HELPERS}" "size_t... Is" ELUNA_MSVC_RENAME_POSITION)
     if(NOT ELUNA_MSVC_RENAME_POSITION EQUAL -1)
       string(REPLACE "size_t... Is" "size_t... ReturnIndices" ELUNA_HOOK_HELPERS "${ELUNA_HOOK_HELPERS}")
@@ -547,7 +547,7 @@ if(BUILD_ELUNA)
       string(REPLACE "indices[Is]" "indices[ReturnIndices]" ELUNA_HOOK_HELPERS "${ELUNA_HOOK_HELPERS}")
     endif()
     file(WRITE ${ELUNA_MSVC_SOURCE_DIR}/HookHelpers.h "${ELUNA_HOOK_HELPERS}")
-    list(REMOVE_ITEM ELUNA_SRCS ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks/SpellHooks.cpp)
+    list(REMOVE_ITEM ELUNA_SRCS ${ELUNA_SOURCE_DIR}/hooks/SpellHooks.cpp)
     list(APPEND ELUNA_SRCS ${ELUNA_MSVC_SOURCE_DIR}/SpellHooks.cpp)
   endif()
 
@@ -675,13 +675,13 @@ if(BUILD_ELUNA)
   )
   target_include_directories(game PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/Eluna
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/hooks
-    ${CMAKE_SOURCE_DIR}/src/modules/Eluna/methods/VMangos
+    ${ELUNA_SOURCE_DIR}
+    ${ELUNA_SOURCE_DIR}/hooks
+    ${ELUNA_SOURCE_DIR}/methods/VMangos
   )
 
   install(
-    DIRECTORY ${CMAKE_SOURCE_DIR}/src/modules/Eluna/extensions
+    DIRECTORY ${CMAKE_SOURCE_DIR}/dep/Eluna/extensions
     DESTINATION ${BIN_DIR}/lua_scripts
   )
 endif()

@@ -14,15 +14,21 @@ The integration is built on the port by Nighthawk42 and Nightdawg in
 ## Build
 
 ```sh
-git submodule update --init --recursive src/modules/Eluna
+git submodule update --init --recursive dep/Eluna
 cmake -S . -B build -DBUILD_ELUNA=ON            # ELUNA_LUA_VERSION=lua52 by default
 cmake --build build --target mangosd
 ```
 
-- The engine is the `src/modules/Eluna` submodule, pinned to `1b06f28` (branch
+- The engine is the `dep/Eluna` submodule, pinned to `1b06f28` (branch
   `cmangos-spell-update` of ElunaLuaEngine/Eluna). Eluna master at the time
   (`58d7652`) declares TrinityCore aura and proc types unguarded and does not
   build for this core.
+- The submodule stays pristine. Fixes this core needs in Eluna go in patch
+  files in `dep/eluna-patches`; `cmake/ElunaSources.cmake` copies
+  `dep/Eluna` to `<build>/dep/eluna-src`, applies the patches in name order
+  (`git apply`, or `patch`) and the build compiles that copy. CMake stops if a
+  patch does not apply. The copy is remade only when a submodule file or a
+  patch changes.
 - The backend is `ELUNA_VMANGOS` with `ELUNA_EXPANSION=0`.
 - Lua (5.2 by default; `ELUNA_LUA_VERSION` takes lua51..lua54) is downloaded
   from lua.org at configure time with a pinned SHA-256 and linked statically.
