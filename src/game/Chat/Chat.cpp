@@ -39,9 +39,6 @@
 #include "GameEventMgr.h"
 #include "HardcodedEvents.h"
 #include "ScriptObjects.h"
-#ifdef ENABLE_ELUNA
-#include "LuaEngine.h"
-#endif
 
 #include <vector>
 
@@ -1695,9 +1692,8 @@ void ChatHandler::ExecuteCommand(const char* text)
         case CHAT_COMMAND_UNKNOWN_SUBCOMMAND:
         {
 #ifdef ENABLE_ELUNA
-            if (Eluna* e = sWorld.GetEluna())
-                if (!e->OnCommand(m_session ? m_session->GetPlayer() : nullptr, fullcmd.c_str()))
-                    return;
+            if (!sWorld.OnElunaCommand(m_session ? m_session->GetPlayer() : nullptr, fullcmd.c_str()))
+                return;
 #endif
             SendSysMessage(LANG_NO_SUBCMD);
             ShowHelpForCommand(command->ChildCommands, text);
@@ -1707,9 +1703,8 @@ void ChatHandler::ExecuteCommand(const char* text)
         case CHAT_COMMAND_UNKNOWN:
         {
 #ifdef ENABLE_ELUNA
-            if (Eluna* e = sWorld.GetEluna())
-                if (!e->OnCommand(m_session ? m_session->GetPlayer() : nullptr, fullcmd.c_str()))
-                    return;
+            if (!sWorld.OnElunaCommand(m_session ? m_session->GetPlayer() : nullptr, fullcmd.c_str()))
+                return;
 #endif
             SendSysMessage(LANG_NO_CMD);
             SetSentErrorMessage(true);

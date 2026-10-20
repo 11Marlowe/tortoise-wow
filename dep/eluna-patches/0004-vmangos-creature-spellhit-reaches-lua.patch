@@ -1,0 +1,18 @@
+diff --git a/ElunaCreatureAI.h b/ElunaCreatureAI.h
+index 5b9898b..80239a4 100644
+--- a/ElunaCreatureAI.h
++++ b/ElunaCreatureAI.h
+@@ -218,10 +218,10 @@ struct ElunaCreatureAI : NativeScriptedAI
+     }
+ 
+     // Called when hit by a spell
+-#if defined ELUNA_TRINITY
++#if defined ELUNA_TRINITY || defined ELUNA_VMANGOS
++    // VMaNGOS: CreatureAI::SpellHit(WorldObject*, SpellEntry const*); a Unit*
++    // caster did not override it and the hook never fired.
+     void SpellHit(WorldObject* caster, SpellInfo const* spell) override
+-#elif defined ELUNA_VMANGOS
+-    void SpellHit(Unit* caster, SpellInfo const* spell)
+ #else
+     void SpellHit(Unit* caster, SpellInfo const* spell) override
+ #endif

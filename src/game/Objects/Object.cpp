@@ -2041,7 +2041,9 @@ void WorldObject::SetMap(Map * map)
     m_InstanceId = map->GetInstanceId();
 
 #ifdef ENABLE_ELUNA
-    elunaMapEvents.reset();
+    // Timed events of the previous map's state stay with that state.
+    if (m_elunaMapEvents.active && !m_elunaMapEvents.IsOwnedBy(map->GetElunaLifetime()))
+        ReleaseElunaMapEvents();
 #endif
 
     // Order is important, must be done after m_currMap is set
@@ -2056,6 +2058,11 @@ Map* WorldObject::GetMap() const
 
 void WorldObject::ResetMap()
 {
+#ifdef ENABLE_ELUNA
+    // Called by the map the object leaves, while that map (and its Lua state)
+    // still exists and on the thread that owns it.
+    ReleaseElunaMapEvents();
+#endif
     m_currMap = nullptr;
     m_zoneScript = nullptr;
 }
@@ -5277,6 +5284,29 @@ bool WorldObject::CheckAndIncreaseCastCounter()
 }
 
 #ifdef ENABLE_ELUNA
+WorldObject::~WorldObject()
+{
+    ReleaseElunaMapEvents();
+
+    if (m_elunaWorldEvents.active)
+    {
+        sWorld.ReleaseElunaWorldEvents(m_elunaWorldEvents.mgr, m_elunaWorldEvents.owner, m_elunaWorldEvents.processorId);
+        m_elunaWorldEvents = ElunaObjectEvents();
+    }
+}
+
+void WorldObject::ReleaseElunaMapEvents()
+{
+    if (!m_elunaMapEvents.active)
+        return;
+
+    // A state that is gone took its EventMgr and processors with it.
+    if (!m_elunaMapEvents.owner.expired())
+        m_elunaMapEvents.mgr->FlagObjectProcessorForDeletion(m_elunaMapEvents.processorId);
+
+    m_elunaMapEvents = ElunaObjectEvents();
+}
+
 Eluna* WorldObject::GetEluna() const
 {
     return IsInWorld() ? GetMap()->GetEluna() : nullptr;
@@ -5284,19 +5314,55 @@ Eluna* WorldObject::GetEluna() const
 
 ElunaEventProcessor* WorldObject::GetElunaEvents(int32 mapId)
 {
-    Eluna* eluna = mapId == -1 ? sWorld.GetEluna() : GetEluna();
-    if (!eluna || !eluna->eventMgr)
-        return nullptr;
+    bool const worldState = mapId == -1;
+    Eluna* eluna = nullptr;
+    std::shared_ptr<void> lifetime;
 
-    EventMgr* eventMgr = eluna->eventMgr.get();
-    std::unique_ptr<ElunaProcessorInfo>& info = mapId == -1 ? elunaWorldEvents : elunaMapEvents;
-    if (!info)
+    if (worldState)
     {
-        uint64 id = eventMgr->CreateObjectProcessor(this);
-        info = std::make_unique<ElunaProcessorInfo>(eventMgr, id);
+        eluna = sWorld.GetEluna();
+        lifetime = sWorld.GetElunaLifetime();
+        // A destroyed object with this guid may still have a queued release:
+        // apply it first, so the new object gets a processor of its own.
+        if (eluna)
+            sWorld.ProcessElunaWorldEventsReleases();
+    }
+    else
+    {
+        if (!IsInWorld())
+            return nullptr;
+
+        // A ship or zeppelin moves between the maps of a continent each update.
+        if (GetTypeId() == TYPEID_GAMEOBJECT && static_cast<GameObject*>(this)->ToTransport())
+            return nullptr;
+
+        Map* map = GetMap();
+        // Only the state of the object's own map: a state of another map
+        // would put its Lua function into this map's EventMgr.
+        if (int32(map->GetId()) != mapId)
+            return nullptr;
+
+        eluna = map->GetEluna();
+        lifetime = map->GetElunaLifetime();
     }
 
-    return eventMgr->GetObjectProcessor(info->GetProcessorId());
+    if (!eluna || !eluna->eventMgr || !lifetime)
+        return nullptr;
+
+    ElunaObjectEvents& events = worldState ? m_elunaWorldEvents : m_elunaMapEvents;
+    if (!worldState && events.active && !events.IsOwnedBy(lifetime))
+        ReleaseElunaMapEvents();
+
+    EventMgr* eventMgr = eluna->eventMgr.get();
+    if (!events.active)
+    {
+        events.processorId = eventMgr->CreateObjectProcessor(this);
+        events.mgr = eventMgr;
+        events.owner = lifetime;
+        events.active = true;
+    }
+
+    return eventMgr->GetObjectProcessor(events.processorId);
 }
 #endif
 void WorldObject::MoveChannelledSpellWithCastTime(Spell* pSpell)

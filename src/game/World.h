@@ -64,6 +64,12 @@ class World;
 class ChannelBroadcaster;
 #ifdef ENABLE_ELUNA
 class Eluna;
+class EventMgr;
+
+// Held while a Lua state is made or destroyed (ElunaMgr's container has no lock
+// of its own) and while Eluna's script cache is reloaded: a state being made
+// reads that cache.
+std::recursive_mutex& ElunaStateLock();
 #endif
 namespace DiscordBot
 {
@@ -1283,6 +1289,19 @@ class World
         // Eluna's OnGameEventStart/Stop are queued here, in order, and called
         // from World::Update.
         void QueueElunaGameEvent(uint16 eventId, bool start);
+        // Alive as long as the world Lua state (see Map::GetElunaLifetime).
+        std::shared_ptr<void> const& GetElunaLifetime() const { return m_elunaLifetime; }
+        // Flags an object's processor in the world state's EventMgr for
+        // deletion: now on the world thread, else queued for World::Update
+        // (before the world state's timers run) so a map thread never changes
+        // the world state's EventMgr.
+        void ReleaseElunaWorldEvents(EventMgr* mgr, std::weak_ptr<void> const& owner, uint64 processorId);
+        // World thread: applies the queued releases.
+        void ProcessElunaWorldEventsReleases();
+        // A command for Lua (OnCommand). ".reload eluna [mapId]" is taken over
+        // here and queued (see ProcessElunaReload). Returns false when the
+        // command was handled, as Eluna::OnCommand.
+        bool OnElunaCommand(Player* player, char const* text);
 #endif
     protected:
         void _UpdateGameTime();
@@ -1432,6 +1451,17 @@ class World
         std::mutex m_elunaGameEventLock;
         std::vector<std::pair<uint16, bool>> m_elunaGameEventQueue;
         void ProcessElunaGameEventQueue();
+        std::shared_ptr<void> m_elunaLifetime;
+        struct ElunaWorldEventsRelease
+        {
+            EventMgr* mgr;
+            std::weak_ptr<void> owner;
+            uint64 processorId;
+        };
+        std::mutex m_elunaReleaseLock;
+        std::vector<ElunaWorldEventsRelease> m_elunaWorldEventsReleases;
+        std::vector<int> m_elunaReloadQueue; // world thread only
+        void ProcessElunaReload();
 #endif
 };
 

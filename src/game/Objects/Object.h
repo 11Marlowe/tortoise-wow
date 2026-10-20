@@ -168,6 +168,7 @@ class Spell;
 #ifdef ENABLE_ELUNA
 class Eluna;
 class ElunaEventProcessor;
+class EventMgr;
 #endif
 
 typedef std::unordered_map<Player *, UpdateData> UpdateDataMapType;
@@ -818,7 +819,11 @@ class WorldObject : public Object
                 WorldObject * const m_obj;
         };
 
+#ifdef ENABLE_ELUNA
+        virtual ~WorldObject();
+#else
         virtual ~WorldObject () {}
+#endif
 
         virtual void Update(uint32 /*update_diff*/, uint32 /*time_diff*/);
 
@@ -1136,12 +1141,39 @@ class WorldObject : public Object
         void SetCreatureSummonLimit(uint32 limit);
 
 #ifdef ENABLE_ELUNA
-        std::unique_ptr<ElunaProcessorInfo> elunaMapEvents;
-        std::unique_ptr<ElunaProcessorInfo> elunaWorldEvents;
-
         Eluna* GetEluna() const;
+        // The processor of this object's Lua timed events (obj:RegisterEvent)
+        // in the calling state: mapId -1 is the world state, otherwise the
+        // state of the object's current map, and only if that is map mapId.
+        // nullptr if there is none (the object is on no map, or on another map
+        // than the caller's, or is a ship/zeppelin).
         ElunaEventProcessor* GetElunaEvents(int32 mapId);
         LuaVal lua_data = LuaVal({});
+    private:
+        // One processor per Lua state, kept in that state's EventMgr. The
+        // object never holds a pointer that can outlive the state: `owner` is
+        // the state's lifetime token (Map/World::GetElunaLifetime) and the
+        // EventMgr is only touched while it is alive. The map processor is
+        // flagged for deletion when the object leaves its map (ResetMap, or
+        // SetMap to another map's state), on the thread that owns that map;
+        // the world processor when the object is destroyed, on the world
+        // thread (queued there from a map thread).
+        struct ElunaObjectEvents
+        {
+            EventMgr* mgr = nullptr;
+            std::weak_ptr<void> owner;
+            uint64 processorId = 0;
+            bool active = false;
+
+            bool IsOwnedBy(std::shared_ptr<void> const& lifetime) const
+            {
+                return active && !owner.owner_before(lifetime) && !lifetime.owner_before(owner);
+            }
+        };
+        ElunaObjectEvents m_elunaMapEvents;
+        ElunaObjectEvents m_elunaWorldEvents;
+        void ReleaseElunaMapEvents();
+    public:
 #endif
 virtual uint32 GetLevel() const = 0;
         uint32 GetLevelForTarget(WorldObject const* target = nullptr) const;

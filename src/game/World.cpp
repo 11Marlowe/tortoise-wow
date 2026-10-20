@@ -103,6 +103,7 @@
 #include "LuaEngine.h"
 #include "ElunaConfig.h"
 #include "ElunaLoader.h"
+#include <algorithm>
 #endif
 
 #ifdef USING_DISCORD_BOT
@@ -2262,9 +2263,12 @@ void LoadPlayerEggLoot();
     {
         ELUNA_LOG_INFO("Starting Eluna world state...");
         m_elunaThread.store(std::this_thread::get_id(), std::memory_order_relaxed);
+        std::lock_guard<std::recursive_mutex> guard(ElunaStateLock());
         m_elunaInfo = { ElunaInfoKey::MakeGlobalKey(0) };
         sElunaMgr->Create(nullptr, m_elunaInfo);
         m_eluna = sElunaMgr->Get(m_elunaInfo);
+        if (m_eluna)
+            m_elunaLifetime = std::make_shared<char>(0);
     }
 #endif
     sLog.outString("Loading groups...");
@@ -2694,6 +2698,8 @@ void World::Update(uint32 diff)
 #ifdef ENABLE_ELUNA
     // After the async tasks and every map update have finished, so the world
     // state never runs next to them.
+    ProcessElunaReload();
+    ProcessElunaWorldEventsReleases();
     ProcessElunaGameEventQueue();
     if (Eluna* eluna = GetEluna())
     {
@@ -4743,6 +4749,108 @@ void World::ProcessElunaGameEventQueue()
 void World::SetElunaWorldThread()
 {
     m_elunaThread.store(std::this_thread::get_id(), std::memory_order_relaxed);
+}
+
+std::recursive_mutex& ElunaStateLock()
+{
+    static std::recursive_mutex lock;
+    return lock;
+}
+
+void World::ReleaseElunaWorldEvents(EventMgr* mgr, std::weak_ptr<void> const& owner, uint64 processorId)
+{
+    if (std::this_thread::get_id() == m_elunaThread.load(std::memory_order_relaxed))
+    {
+        if (!owner.expired())
+            mgr->FlagObjectProcessorForDeletion(processorId);
+        return;
+    }
+
+    // An object destroyed on a map thread: until this runs, its processor in
+    // the world state still points at it, which is safe because only
+    // EventMgr::UpdateProcessors (World::Update, after the queue is drained)
+    // reads that pointer.
+    std::lock_guard<std::mutex> guard(m_elunaReleaseLock);
+    m_elunaWorldEventsReleases.push_back({ mgr, owner, processorId });
+}
+
+void World::ProcessElunaWorldEventsReleases()
+{
+    std::vector<ElunaWorldEventsRelease> releases;
+    {
+        std::lock_guard<std::mutex> guard(m_elunaReleaseLock);
+        releases.swap(m_elunaWorldEventsReleases);
+    }
+
+    for (ElunaWorldEventsRelease const& release : releases)
+        if (!release.owner.expired())
+            release.mgr->FlagObjectProcessorForDeletion(release.processorId);
+}
+
+bool World::OnElunaCommand(Player* player, char const* text)
+{
+    Eluna* eluna = GetEluna();
+    if (!eluna)
+        return true;
+
+    // Eluna's own ".reload eluna" starts its script cache reload on a thread
+    // of its own and returns; map threads would then make new states (Map's
+    // constructor) or reload states from that cache while it is rewritten.
+    // The core takes the command over and reloads at a safe point instead.
+    if (sElunaConfig->IsReloadCommandEnabled() && (!player || player->GetSession()->GetSecurity() >= sElunaConfig->GetReloadSecurityLevel()))
+    {
+        std::string command = text ? text : "";
+        std::transform(command.begin(), command.end(), command.begin(), ::tolower);
+        std::string const reloadCommand = "reload eluna";
+        if (command.find(reloadCommand) == 0)
+        {
+            int mapId = RELOAD_ALL_STATES;
+            std::string args = command.substr(reloadCommand.length());
+            if (!args.empty())
+                mapId = strtol(args.c_str(), nullptr, 10);
+
+            m_elunaReloadQueue.push_back(mapId);
+            sLog.outString("Eluna: script reload queued (%d); it runs at the end of this world update.", mapId);
+            return false;
+        }
+    }
+
+    return eluna->OnCommand(player, text);
+}
+
+void World::ProcessElunaReload()
+{
+    if (m_elunaReloadQueue.empty() || !GetEluna())
+        return;
+
+    std::vector<int> queue;
+    queue.swap(m_elunaReloadQueue);
+
+    // Here every map update and async task of this tick has finished, and no
+    // state can be made or destroyed while the lock is held. The cache is
+    // rebuilt by Eluna's loader thread; waiting for it before going on means
+    // map threads only ever read a finished cache.
+    // Lock order as in MapManager::CreateMap: the map manager's lock, then
+    // ElunaStateLock (Map's constructor).
+    sMapMgr.DoWithMapsLocked([&]()
+    {
+        std::lock_guard<std::recursive_mutex> guard(ElunaStateLock());
+        for (int mapId : queue)
+        {
+            if (sElunaLoader->GetCacheState() != SCRIPT_CACHE_READY)
+            {
+                sLog.outError("Eluna: script cache not ready, reload (%d) skipped.", mapId);
+                continue;
+            }
+
+            uint32 const start = WorldTimer::getMSTime();
+            sElunaLoader->ReloadElunaForMap(mapId);
+            while (sElunaLoader->GetCacheState() != SCRIPT_CACHE_READY)
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
+            sLog.outString("Eluna: script cache reloaded in %u ms (%d); states reload on their next update.", WorldTimer::getMSTimeDiffToNow(start), mapId);
+        }
+    });
 }
 
 #endif

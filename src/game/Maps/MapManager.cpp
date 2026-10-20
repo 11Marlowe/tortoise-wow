@@ -1185,7 +1185,15 @@ bool MapManager::waitContinentUpdateFinishedUntil(std::chrono::high_resolution_c
 #ifdef ENABLE_ELUNA
 void MapManager::DoForAllMaps(std::function<void(Map*)> const& worker)
 {
+    // The lock CreateMap takes when it adds a map.
+    Guard guard(*this);
     for (auto const& entry : i_maps)
         worker(entry.second);
+}
+
+void MapManager::DoWithMapsLocked(std::function<void()> const& worker)
+{
+    Guard guard(*this);
+    worker();
 }
 #endif

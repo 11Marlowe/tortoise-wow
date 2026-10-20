@@ -1,0 +1,33 @@
+diff --git a/ElunaInstanceAI.h b/ElunaInstanceAI.h
+index 54a780b..bb24559 100644
+--- a/ElunaInstanceAI.h
++++ b/ElunaInstanceAI.h
+@@ -91,6 +91,10 @@ public:
+     const char* Save() const;
+ #elif defined ELUNA_VMANGOS
+     const char* Save() const;
++    // VMaNGOS declares InstanceData::Save() non-const, so the const Save above
++    // does not override it: the core's SaveToDB got the base class's "" and
++    // wrote the Lua data as empty. This override hands the core the Lua data.
++    const char* Save() override { return static_cast<ElunaInstanceAI const*>(this)->Save(); }
+ #else
+     const char* Save() const override;
+ #endif
+@@ -114,6 +118,9 @@ public:
+     uint32 GetData(uint32 key) const override;
+ #else
+     uint32 GetData(uint32 key) const;
++    // Non-const in VMaNGOS' InstanceData: route the core's (and C++ scripts')
++    // calls to the Lua data, as Save above.
++    uint32 GetData(uint32 key) override { return static_cast<ElunaInstanceAI const*>(this)->GetData(key); }
+ #endif
+     void SetData(uint32 key, uint32 value) override;
+ 
+@@ -121,6 +128,7 @@ public:
+     uint64 GetData64(uint32 key) const override;
+ #else
+     uint64 GetData64(uint32 key) const;
++    uint64 GetData64(uint32 key) override { return static_cast<ElunaInstanceAI const*>(this)->GetData64(key); }
+ #endif
+     void SetData64(uint32 key, uint64 value) override;
+ 

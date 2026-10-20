@@ -629,6 +629,10 @@ class Map : public GridRefManager<NGridType>
         // map threads, so one map being made or destroyed never races another
         // map's lookup.
         Eluna* GetEluna() const { return m_eluna; }
+        // Alive exactly as long as this map's Lua state: objects keep a
+        // weak_ptr to it instead of a pointer into the state (WorldObject's
+        // timed events). Empty when the map has no state.
+        std::shared_ptr<void> const& GetElunaLifetime() const { return m_elunaLifetime; }
         LuaVal lua_data = LuaVal({});
 #endif
         XStatTimer MovementPerfTimer;
@@ -995,6 +999,7 @@ class Map : public GridRefManager<NGridType>
     private:
         ElunaInfo m_elunaInfo;
         Eluna* m_eluna = nullptr;
+        std::shared_ptr<void> m_elunaLifetime;
 #endif
 };
 

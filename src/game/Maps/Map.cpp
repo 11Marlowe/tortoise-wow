@@ -65,19 +65,12 @@
 #include "LuaEngine.h"
 #include "ElunaConfig.h"
 
-// ElunaMgr keeps its states in an unlocked container; maps can be made and
-// destroyed from more than one thread, so changes to it are serialised here.
-static std::mutex s_elunaMgrLock;
 #endif
 Map::~Map()
 {
 #ifdef ENABLE_ELUNA
     if (Eluna* eluna = GetEluna())
-    {
         eluna->OnDestroy(this);
-        if (Instanceable())
-            eluna->FreeInstanceId(GetInstanceId());
-    }
 #endif
     UnloadAll(true);
 
@@ -104,10 +97,17 @@ Map::~Map()
     m_weatherSystem = nullptr;
 #ifdef ENABLE_ELUNA
     // Last, after the objects and the instance data that may hold event
-    // processors or references into this state are gone.
+    // processors or references into this state are gone. The instance's Lua
+    // data and instance hooks are freed only now: unloading the objects above
+    // still calls the instance script, which would otherwise find its data
+    // missing and load it again (running OnLoad) during the unload.
     if (m_eluna)
     {
-        std::lock_guard<std::mutex> guard(s_elunaMgrLock);
+        if (Instanceable())
+            m_eluna->FreeInstanceId(GetInstanceId());
+
+        std::lock_guard<std::recursive_mutex> guard(ElunaStateLock());
+        m_elunaLifetime.reset();
         m_eluna = nullptr;
         sElunaMgr->Destroy(m_elunaInfo);
     }
@@ -178,10 +178,14 @@ Map::Map(uint32 id, time_t expiry, uint32 InstanceId)
 #ifdef ENABLE_ELUNA
     if (sElunaConfig->IsElunaEnabled() && sElunaConfig->ShouldMapLoadEluna(id))
     {
-        std::lock_guard<std::mutex> guard(s_elunaMgrLock);
+        // Also excludes a script reload (World::ProcessElunaReload): a new
+        // state reads Eluna's script cache while it is made.
+        std::lock_guard<std::recursive_mutex> guard(ElunaStateLock());
         m_elunaInfo = { ElunaInfoKey::MakeKey(GetId(), GetInstanceId()) };
         sElunaMgr->Create(this, m_elunaInfo);
         m_eluna = sElunaMgr->Get(m_elunaInfo);
+        if (m_eluna)
+            m_elunaLifetime = std::make_shared<char>(0);
     }
 
     if (Eluna* eluna = GetEluna())
@@ -1966,17 +1970,27 @@ void Map::CreateInstanceData(bool load)
         return;
 
 #ifdef ENABLE_ELUNA
-    // A Lua instance script takes the place of a C++ one.
-    if (Eluna* eluna = GetEluna())
-        i_data = eluna->GetInstanceData(this);
-
-    if (!i_mapEntry->scriptId && !i_data)
-        return;
-
+    // The map's C++ instance script comes first, as C++ creature scripts come
+    // before Lua creature AI: its boss scripts cast GetInstanceData() to their
+    // own instance class, which a Lua instance script in its place is not.
+    // A Lua instance script (RegisterMapEvent / RegisterInstanceEvent) runs on
+    // maps that have no C++ one.
     i_script_id = i_mapEntry->scriptId;
-
-    if (!i_data)
+    if (i_script_id)
         i_data = sScriptMgr.CreateInstanceData(this);
+
+    if (Eluna* eluna = GetEluna())
+    {
+        if (!i_data)
+            i_data = eluna->GetInstanceData(this);
+        else if (InstanceData* luaData = eluna->GetInstanceData(this))
+        {
+            delete luaData;
+            sLog.outError("Eluna: map %u has a C++ instance script (%s); its Lua map/instance events are not used.",
+                GetId(), sScriptMgr.GetScriptName(i_script_id));
+        }
+    }
+
     if (!i_data)
         return;
 #else

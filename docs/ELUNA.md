@@ -23,12 +23,19 @@ cmake --build build --target mangosd
   `cmangos-spell-update` of ElunaLuaEngine/Eluna). Eluna master at the time
   (`58d7652`) declares TrinityCore aura and proc types unguarded and does not
   build for this core.
-- The submodule stays pristine. Fixes this core needs in Eluna go in patch
-  files in `dep/eluna-patches`; `cmake/ElunaSources.cmake` copies
+- The submodule stays pristine. The fixes this core needs in Eluna are the
+  patch files in `dep/eluna-patches`; `cmake/ElunaSources.cmake` copies
   `dep/Eluna` to `<build>/dep/eluna-src`, applies the patches in name order
   (`git apply`, or `patch`) and the build compiles that copy. CMake stops if a
-  patch does not apply. The copy is remade only when a submodule file or a
-  patch changes.
+  patch does not apply (after a submodule bump, refresh the patches). The copy
+  is remade only when a submodule file or a patch changes.
+
+  | Patch | Fixes |
+  | --- | --- |
+  | `0001-eventmgr-...` | An object that left a state and came back before the state's next cleanup got a new event processor that was destroyed at once while still listed (use after free). |
+  | `0002-vmangos-refuse-objects-of-another-map` | A map state could use objects of another map (see Threading rules). |
+  | `0003-vmangos-instance-data-...` | `Save`, `GetData` and `GetData64` of a Lua instance script did not override this core's non-const `InstanceData` methods: instance data was saved empty and lost at a restart, and C++ callers read 0. |
+  | `0004-vmangos-creature-spellhit-...` | `CREATURE_EVENT_ON_HIT_BY_SPELL` never fired: the Lua AI's `SpellHit` did not override this core's `CreatureAI::SpellHit(WorldObject*, ...)`. |
 - The backend is `ELUNA_VMANGOS` with `ELUNA_EXPANSION=0`.
 - Lua (5.2 by default; `ELUNA_LUA_VERSION` takes lua51..lua54) is downloaded
   from lua.org at configure time with a pinned SHA-256 and linked statically.
@@ -41,7 +48,18 @@ cmake --build build --target mangosd
 `Eluna.Enabled` (default 1 in an Eluna build) is read once, at startup. With 0
 no Lua state is made and the bridge scripts are not registered, so each hook
 site costs one null check. Scripts go in `Eluna.ScriptPath` (`./lua_scripts`);
-`.reload eluna` reloads them (`Eluna.ReloadCommand`, `Eluna.ReloadSecurityLevel`).
+`.reload eluna [mapId]` reloads them (`Eluna.ReloadCommand`,
+`Eluna.ReloadSecurityLevel`).
+
+The core takes `.reload eluna` over from Eluna (`World::OnElunaCommand`).
+Eluna reloads its script cache on a thread of its own, while map threads make
+new states (a new instance) and reload states from the same cache. The core
+queues the command and runs it in `World::Update` after every map update and
+async task of the tick has finished, holding the map manager's lock and the
+lock under which states are made (`ElunaStateLock`), and waits for the cache
+to be rebuilt before the maps update again. Each state then runs the scripts
+again on its next update. The world update stalls for the time the scripts
+take to compile (logged).
 
 There is one **world state** and one **state per map and instance**
 (`Eluna.OnlyOnMaps` limits which maps get one).
@@ -72,7 +90,28 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
 - **Packet hooks** (`OnPacketSend`, `OnPacketReceive`) are not bridged: they
   would run on network threads.
 - `Map` and `World` cache their `Eluna*`. Eluna's `ElunaMgr` container has no
-  lock, so the core only touches it to make and destroy states, under one mutex.
+  lock, so the core only touches it to make and destroy states, under one mutex
+  (`ElunaStateLock`).
+- **Objects of another map.** A map state only uses objects on its own map
+  (`dep/eluna-patches/0002`): a player, creature, gameobject, item (by its
+  owner) or `Map` userdata of another map is refused when a method is called
+  on it, with the Lua error "... got an object on another map ...: refused".
+  `GetPlayerByGUID`, `GetPlayerByName` and `GetPlayersInWorld` still return such
+  players; scripts can test them with `pcall`. The world state may use objects
+  of any map: it only runs while no map updates. Groups and guilds are not
+  bound to a map and are not checked.
+- **Timed events of objects** (`obj:RegisterEvent`). An object's events live in
+  the event manager of the state that registered them, and only the state of
+  the object's own map can register map events on it. The object never keeps a
+  pointer into a state that can outlive it (it keeps a `weak_ptr` to the
+  state's lifetime token, `Map/World::GetElunaLifetime`). Its map events are
+  dropped when it leaves the map (teleport, despawn, logout), on the thread
+  that owns that map, so a timer never runs for a player on another map and an
+  instance can be unloaded while a player who was in it is elsewhere. World
+  state events of an object destroyed on a map thread are dropped on the world
+  thread before the world state's timers run. Ships and zeppelins
+  (`MO_TRANSPORT`) cannot have map events (`RegisterEvent` returns nil): they
+  move between the maps of a continent.
 
 ## Where the hooks are
 
@@ -92,11 +131,48 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
 - `src/game/Eluna/CustomMethods.h` registers `SpellInfo` methods backed by
   `spell_template`.
 
-## Sample script
+## Instance scripts
 
-`dep/lualib/tests/eluna_port_smoke.lua` logs `ELUNA_SMOKE ...` lines for a
-login, a command (`.elunasmoke`), gossip on creature 823, map updates, timed
-events and `.reload eluna`.
+A map's C++ instance script comes first, as C++ creature scripts come before
+Lua creature AI. Lua instance events (`RegisterMapEvent`,
+`RegisterInstanceEvent` with `INSTANCE_EVENT_*`) run on maps without a C++
+instance script; on a map with one the server logs "Eluna: map M has a C++
+instance script ...; its Lua map/instance events are not used." The C++ boss
+and door scripts cast the map's instance data to their own instance class, so
+a Lua instance script in its place would break them (and their casts would
+read the wrong object).
+
+Lua instance data is saved to the `instance` (or `world`) table through the
+core's `InstanceData::SaveToDB` (`map:SaveInstanceData()`), and loaded with
+the map. The Lua data and the instance's events are freed when the map is
+destroyed, after its objects are unloaded.
+
+## Sample scripts
+
+- `dep/lualib/tests/eluna_port_smoke.lua` logs `ELUNA_SMOKE ...` lines for a
+  login, a command (`.elunasmoke`), gossip on creature 823, map updates, timed
+  events and `.reload eluna`.
+- `dep/lualib/tests/eluna_review_603_smoke.lua` logs `ELUNA_603 ...` lines for
+  the fixes after the #603 review: player timers across teleports and instance
+  unloads, refusal of objects of another map, instance data across a restart,
+  `.reload eluna` while instances open, `CREATURE_EVENT_ON_HIT_BY_SPELL` and
+  `GAMEOBJECT_EVENT_ON_SPAWN` (on spawn and respawn). The header says what to
+  do and what to expect.
+
+## Known limits
+
+- **Lua creature AI replaces the creature's AI.** A creature with any
+  `RegisterCreatureEvent` gets Eluna's Lua AI (`ElunaCreatureAI`, built on
+  `AggressorAI` through `src/game/AI/BasicAI.h`) instead of its EventAI,
+  GuardAI or other database AI; C++ creature scripts still come first. Events
+  the Lua script does not handle fall back to `AggressorAI`, not to the
+  creature's own AI. Keeping the original AI as the fallback would mean two AI
+  objects per creature with the core reaching only the outer one (combat
+  movement, melee and spell-list state set by scripts through `AI()`), which is
+  not safe without changes to the AI classes. Script the whole creature in Lua,
+  or keep it on its database AI.
+- **Spell script events** (`SPELL_EVENT_*`): this Eluna pin has no
+  `RegisterSpellEvent` for VMaNGOS, so they cannot be registered.
 
 ## Not done yet
 

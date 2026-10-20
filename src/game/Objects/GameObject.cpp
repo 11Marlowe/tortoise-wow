@@ -321,7 +321,9 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
         m_zoneScript->OnObjectCreate(this);
 
 #ifdef ENABLE_ELUNA
-    if (Eluna* e = GetEluna())
+    // Not GetEluna(): that is the state of the map the object is in, and the
+    // object is only added to the map after Create.
+    if (Eluna* e = map->GetEluna())
         e->OnSpawn(this);
 #endif
     return true;
@@ -507,6 +509,11 @@ void GameObject::Update(uint32 update_diff, uint32 /*p_time*/)
                             }
                             else
                                 GetMap()->Add(this);
+#ifdef ENABLE_ELUNA
+                            // Respawned: GAMEOBJECT_EVENT_ON_SPAWN, as for a creature.
+                            if (Eluna* e = GetMap()->GetEluna())
+                                e->OnSpawn(this);
+#endif
                     }
                 }
             }
