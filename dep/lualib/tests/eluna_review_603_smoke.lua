@@ -33,8 +33,10 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      Type ".reload eluna" repeatedly (or set SMOKE_RELOAD_EVERY_MS) while
      players or bots enter instances. Expect "Eluna: script reload queued"
      then "Eluna: script cache reloaded in N ms", a new "loaded" line per
-     state, and no crash. (A ThreadSanitizer build shows no race on
-     ElunaLoader's cache.)
+     state, and no crash. A ThreadSanitizer build with SMOKE_RELOAD_EVERY_MS =
+     20000 and players in instances must show no report in Eluna code (before
+     dep/eluna-patches/0005: ElunaTemplate<T>::Register / Push, the per-type
+     name stored by every state's reload on its own map thread).
 
   5  spell hit and gameobject spawn reach Lua
      Cast any spell on creature SMOKE_CREATURE_ENTRY (this script gives it Lua
