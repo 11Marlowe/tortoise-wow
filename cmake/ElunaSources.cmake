@@ -45,45 +45,43 @@ if(ELUNA_PATCHES AND NOT ELUNA_GIT_EXECUTABLE AND NOT ELUNA_PATCH_EXECUTABLE)
   message(FATAL_ERROR "Eluna: neither git nor patch was found to apply dep/eluna-patches")
 endif()
 
-# Runs the patch tool on the copy. mode: apply, or verify (the patch must be
-# present: it reverses cleanly).
+# Runs the patch tool in dir. mode: apply, or reverse (takes the patch out).
 #
 # `git apply` run inside a git work tree takes the paths of the patch relative
 # to that repository's root; with the build directory inside the core's
 # checkout (cmake -B build) it skips every file and still exits 0. Git is
-# therefore kept from looking above the copy (GIT_CEILING_DIRECTORIES) and
-# GIT_DIR / GIT_WORK_TREE are cleared, so it works as a plain patch tool on
-# the copy, and a "Skipped patch" line counts as a failure as well.
-function(eluna_patch_tool mode patch result_var output_var)
-  get_filename_component(copy_parent "${ELUNA_SOURCE_DIR}" DIRECTORY)
+# therefore kept from looking above dir (GIT_CEILING_DIRECTORIES) and GIT_DIR /
+# GIT_WORK_TREE are cleared, so it works as a plain patch tool there; a
+# "Skipped patch" line, or no "Checking patch" line, counts as a failure.
+# Without git, `patch` runs with --fuzz=0 (a hunk lands only where its context
+# matches exactly) and --force on reverse (never asks; with --batch a patch
+# that is not applied gives "Unreversed patch detected!  Ignoring -R." and
+# exits 0).
+function(eluna_patch_tool mode dir patch result_var output_var)
+  get_filename_component(dir_parent "${dir}" DIRECTORY)
   if(ELUNA_GIT_EXECUTABLE)
     set(git_args apply -v --whitespace=nowarn -p1)
-    if(mode STREQUAL "verify")
-      list(APPEND git_args --check --reverse)
+    if(mode STREQUAL "reverse")
+      list(APPEND git_args --reverse)
     endif()
     execute_process(
       COMMAND "${CMAKE_COMMAND}" -E env --unset=GIT_DIR --unset=GIT_WORK_TREE
-              "GIT_CEILING_DIRECTORIES=${copy_parent}"
+              "GIT_CEILING_DIRECTORIES=${dir_parent}"
               "${ELUNA_GIT_EXECUTABLE}" ${git_args} "${patch}"
-      WORKING_DIRECTORY "${ELUNA_SOURCE_DIR}"
+      WORKING_DIRECTORY "${dir}"
       RESULT_VARIABLE result
       OUTPUT_VARIABLE output
       ERROR_VARIABLE output)
   else()
-    # --fuzz=0: a hunk lands only where its context matches exactly (not
-    # somewhere nearby after a submodule bump). Verify uses --force, not
-    # --batch: with --batch a patch that is NOT applied gives "Unreversed patch
-    # detected!  Ignoring -R." and exits 0; --force never asks and assumes the
-    # patch is not reversed, so reversing an absent patch fails its hunks.
     set(patch_args -p1 --fuzz=0 -i "${patch}")
-    if(mode STREQUAL "verify")
-      list(APPEND patch_args -R --dry-run --force)
+    if(mode STREQUAL "reverse")
+      list(APPEND patch_args -R --force)
     else()
       list(APPEND patch_args --forward --batch)
     endif()
     execute_process(
       COMMAND "${ELUNA_PATCH_EXECUTABLE}" ${patch_args}
-      WORKING_DIRECTORY "${ELUNA_SOURCE_DIR}"
+      WORKING_DIRECTORY "${dir}"
       RESULT_VARIABLE result
       OUTPUT_VARIABLE output
       ERROR_VARIABLE output)
@@ -93,7 +91,6 @@ function(eluna_patch_tool mode patch result_var output_var)
   if(result EQUAL 0 AND output MATCHES "Skipped patch|[Uu]nreversed patch|Ignoring -R|[Rr]eversed \\(or previously applied\\)|FAILED|[Ff]uzz [1-9]")
     set(result 1)
   endif()
-  # git -v names every file it checks: no "Checking patch" means it did nothing.
   if(result EQUAL 0 AND ELUNA_GIT_EXECUTABLE AND NOT output MATCHES "Checking patch")
     set(result 1)
   endif()
@@ -101,11 +98,13 @@ function(eluna_patch_tool mode patch result_var output_var)
   set(${output_var} "${output}" PARENT_SCOPE)
 endfunction()
 
-# Sets out_var to the empty string when every patch is present in the copy,
-# else to the name (and tool output) of the first one that is not. Two checks:
-# the patch reverses cleanly, and its marker (each patch adds a
-# "#define ELUNA_TW_PATCH_<n> 1" line, which src/game/ElunaScriptBridge.cpp
-# also requires at compile time) is in the copy's headers.
+# Sets out_var to the empty string when the copy is exactly dep/Eluna with
+# every patch applied, else to what is wrong. Two checks: each patch's marker
+# (a "#define ELUNA_TW_PATCH_<n> 1" line, which src/game/ElunaScriptBridge.cpp
+# also requires at compile time) is in the copy's headers; and a scratch copy
+# of the copy, with the patches taken out again last to first (patches may
+# touch the same lines, so they are reversed in order, not one by one), is
+# file for file the pristine submodule.
 function(eluna_verify_copy out_var)
   set(missing "")
   if(NOT EXISTS "${ELUNA_SOURCE_DIR}/LuaEngine.h")
@@ -131,12 +130,41 @@ function(eluna_verify_copy out_var)
         set(missing "${patch_name} (marker not in the copy)")
         break()
       endif()
-      eluna_patch_tool(verify "${patch}" result output)
+    endforeach()
+  endif()
+  if(NOT missing AND ELUNA_PATCHES)
+    get_filename_component(copy_parent "${ELUNA_SOURCE_DIR}" DIRECTORY)
+    set(scratch "${copy_parent}/eluna-src-verify")
+    file(REMOVE_RECURSE "${scratch}")
+    file(COPY "${ELUNA_SOURCE_DIR}/" DESTINATION "${scratch}" PATTERN ".eluna-patch-stamp" EXCLUDE)
+    set(reversed_patches ${ELUNA_PATCHES})
+    list(REVERSE reversed_patches)
+    foreach(patch IN LISTS reversed_patches)
+      eluna_patch_tool(reverse "${scratch}" "${patch}" result output)
       if(NOT result EQUAL 0)
-        set(missing "${patch_name}:\n${output}")
+        get_filename_component(patch_name "${patch}" NAME)
+        set(missing "${patch_name} does not come out of the copy:\n${output}")
         break()
       endif()
     endforeach()
+    if(NOT missing)
+      file(GLOB_RECURSE scratch_files LIST_DIRECTORIES false RELATIVE "${scratch}" "${scratch}/*")
+      list(FILTER scratch_files EXCLUDE REGEX "\\.orig$|\\.rej$")
+      list(SORT scratch_files)
+      if(NOT scratch_files STREQUAL ELUNA_PRISTINE_FILES)
+        set(missing "the copy has other files than dep/Eluna")
+      else()
+        foreach(relative_path IN LISTS ELUNA_PRISTINE_FILES)
+          file(SHA256 "${scratch}/${relative_path}" scratch_hash)
+          file(SHA256 "${ELUNA_PRISTINE_DIR}/${relative_path}" pristine_hash)
+          if(NOT scratch_hash STREQUAL pristine_hash)
+            set(missing "${relative_path} differs from dep/Eluna once the patches are taken out")
+            break()
+          endif()
+        endforeach()
+      endif()
+    endif()
+    file(REMOVE_RECURSE "${scratch}")
   endif()
   set(${out_var} "${missing}" PARENT_SCOPE)
 endfunction()
@@ -171,7 +199,7 @@ if(ELUNA_REMAKE_COPY)
 
   foreach(patch IN LISTS ELUNA_PATCHES)
     get_filename_component(patch_name "${patch}" NAME)
-    eluna_patch_tool(apply "${patch}" patch_result patch_output)
+    eluna_patch_tool(apply "${ELUNA_SOURCE_DIR}" "${patch}" patch_result patch_output)
     if(NOT patch_result EQUAL 0)
       file(REMOVE_RECURSE "${ELUNA_SOURCE_DIR}")
       message(FATAL_ERROR "Eluna: ${patch_name} does not apply to dep/Eluna:\n${patch_output}")
