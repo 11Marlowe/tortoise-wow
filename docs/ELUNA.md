@@ -31,14 +31,16 @@ cmake --build build --target mangosd
   inside it, `cmake -B build`, would otherwise make it skip every file and
   still succeed; a build path with a `:` in it breaks that guard, which then
   ends in a CMake error, not a silent pass). Without git, `patch -p1
-  --fuzz=0` is used. After applying, CMake checks every patch is in the copy (it
-  reverses cleanly and its `ELUNA_TW_PATCH_<n>` marker is there) and stops if a
-  patch does not apply or is missing (after a submodule bump, refresh the
-  patches); the checks run on every configure and remake a copy that lacks a
-  patch. `src/game/ElunaScriptBridge.cpp` also fails to compile (`#error`)
-  without the four markers. The copy is remade when a submodule file, a patch
-  or `ElunaSources.cmake` changes. Each patch names its Eluna base commit;
-  0001, 0003 and 0004 are candidates to upstream to Eluna, 0002 is
+  --fuzz=0` is used. After applying, CMake checks the copy: every patch's
+  `ELUNA_TW_PATCH_<n>` marker is there, and a scratch copy of it with the
+  patches taken out again, last to first (they may touch the same lines), is
+  file for file the pristine submodule. CMake stops if a patch does not apply
+  or is missing (after a submodule bump, refresh the patches); the checks run
+  on every configure and remake a copy that fails them.
+  `src/game/ElunaScriptBridge.cpp` also fails to compile (`#error`) without
+  the five markers. The copy is remade when a submodule file, a patch or
+  `ElunaSources.cmake` changes. Each patch names its Eluna base commit; 0001,
+  0003, 0004 and 0005 are candidates to upstream to Eluna, 0002 is
   VMaNGOS-specific (other cores get the check from trackable pointers).
 
   | Patch | Fixes |
@@ -47,6 +49,7 @@ cmake --build build --target mangosd
   | `0002-vmangos-refuse-objects-of-another-map` | A map state could use objects of another map (see Threading rules). |
   | `0003-vmangos-instance-data-...` | `Save`, `GetData` and `GetData64` of a Lua instance script did not override this core's non-const `InstanceData` methods: instance data was saved empty and lost at a restart, and C++ callers read 0. |
   | `0004-vmangos-creature-spellhit-...` | `CREATURE_EVENT_ON_HIT_BY_SPELL` never fired: the Lua AI's `SpellHit` did not override this core's `CreatureAI::SpellHit(WorldObject*, ...)`. |
+  | `0005-template-name-and-decoding-table-...` | Data race: every Lua state stored the per-type `ElunaTemplate<T>::tname` (one static per type for the whole process) in `Register`, so map states made or reloaded on different map threads wrote it at once while other states read it in `Push`/`Check`; also the lazy build of the base-64 table used for instance data. Both are now set once (`std::call_once`, a function-local static). |
 - The backend is `ELUNA_VMANGOS` with `ELUNA_EXPANSION=0`.
 - Lua (5.2 by default; `ELUNA_LUA_VERSION` takes lua51..lua54) is downloaded
   from lua.org at configure time with a pinned SHA-256 and linked statically.
@@ -69,8 +72,14 @@ queues the command and runs it in `World::Update` after every map update and
 async task of the tick has finished, holding the map manager's lock and the
 lock under which states are made (`ElunaStateLock`), and waits for the cache
 to be rebuilt before the maps update again. Each state then runs the scripts
-again on its next update. The world update stalls for the time the scripts
-take to compile (logged).
+again on its next update, on the thread that updates its map: states of
+maps updated in parallel (continents, instances) reload in parallel, each in
+its own `lua_State`. What they share is process-wide: Eluna's script cache
+(only read then, see above) and the per-type names of Eluna's userdata
+types, which every new or reloaded state registered again (a race found by
+ThreadSanitizer with `.reload eluna` every 20 s; fixed by
+`dep/eluna-patches/0005`, see the patch table). The world update stalls for
+the time the scripts take to compile (logged).
 
 There is one **world state** and one **state per map and instance**
 (`Eluna.OnlyOnMaps` limits which maps get one).
@@ -174,6 +183,27 @@ destroyed, after its objects are unloaded.
   do and what to expect.
 
 ## Known limits
+
+- **Global functions that change server-wide data** (for example
+  `AddTaxiPath`, which adds taxi nodes and paths to the core's tables) are
+  callable in every state, as upstream. In a map state they run on that map's
+  thread next to other maps: call them from the world state (server events),
+  which only runs while no map updates.
+- **ThreadSanitizer** (`.reload eluna` every 20 s and a console reload every
+  60 s, four players teleporting between continents and instances, all map
+  thread settings at 4, 15 min): before 0005, 675 reports in
+  `ElunaTemplate<T>::Register`/`Push` (one per type per parallel reload); with
+  0005, none, and no report has Eluna's own code at a racing access (the
+  remaining ones there are the core's `Log::outTimestamp`/`localtime` and
+  `ThreadPool::status`, reached from `PrintInfo` and the map pool). Reports whose stacks pass through Lua
+  are this core's races between instance threads (pet summon:
+  `ObjectMgr::GeneratePetNumber`, `Pet::Pet`; waypoint groups:
+  `CreatureGroup::SetLastReachedWaypoint`; terrain and navmesh loading:
+  `TerrainInfo::GetGrid`, `dtNavMesh`), reached the same way without Lua. In
+  those reports the Lua frames sit below the map thread's own
+  `ThreadPool::worker::loop`, which no Lua call can run: they are left over
+  from an earlier Lua error (a refused cross-map object inside `pcall`; Lua
+  unwinds with `longjmp` through C++ frames), not callers.
 
 - **Lua creature AI replaces the creature's AI.** A creature with any
   `RegisterCreatureEvent` gets Eluna's Lua AI (`ElunaCreatureAI`, built on
