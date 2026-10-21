@@ -191,7 +191,7 @@ destroyed, after its objects are unloaded.
   which only runs while no map updates.
 - **ThreadSanitizer** (`.reload eluna` every 20 s and a console reload every
   60 s, four players teleporting between continents and instances, all map
-  thread settings at 4, 15 min): before 0005, 675 reports in
+  thread settings at 4; 17 min before 0005, 15 min with it): before 0005, 675 reports in
   `ElunaTemplate<T>::Register`/`Push` (one per type per parallel reload); with
   0005, none, and no report has Eluna's own code at a racing access (the
   remaining ones there are the core's `Log::outTimestamp`/`localtime` and
