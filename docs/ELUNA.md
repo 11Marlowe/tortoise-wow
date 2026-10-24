@@ -50,7 +50,7 @@ cmake --build build --target mangosd
   | `0003-vmangos-instance-data-...` | `Save`, `GetData` and `GetData64` of a Lua instance script did not override this core's non-const `InstanceData` methods: instance data was saved empty and lost at a restart, and C++ callers read 0. |
   | `0004-vmangos-creature-spellhit-...` | `CREATURE_EVENT_ON_HIT_BY_SPELL` never fired: the Lua AI's `SpellHit` did not override this core's `CreatureAI::SpellHit(WorldObject*, ...)`. |
   | `0005-template-name-and-decoding-table-...` | Data race: every Lua state stored the per-type `ElunaTemplate<T>::tname` (one static per type for the whole process) in `Register`, so map states made or reloaded on different map threads wrote it at once while other states read it in `Push`/`Check`; also the lazy build of the base-64 table used for instance data. Both are now set once (`std::call_once`, a function-local static). |
-  | `0006-eventmgr-free-lua-references-...` | Lua function references of timers leaked: when an object left its map or was destroyed with a timer pending, its event processor was removed with the events set to `LUAEVENT_STATE_ERASE`, which skips `luaL_unref` (meant for a closed or reloaded state). Each such timer's function, and what its upvalues reach, stayed in the state's registry until the state closed. They are now unreferenced (`LUAEVENT_STATE_ABORT`) on the thread that updates the state. |
+  | `0006-eventmgr-free-lua-references-...` | Lua function references of timers leaked: when an object left its map or was destroyed with a timer pending, its event processor was removed with the events set to `LUAEVENT_STATE_ERASE`, which skips `luaL_unref` (meant for a closed or reloaded state). Each such timer's function, and what its upvalues reach, stayed in the state's registry until the state closed. They are now unreferenced (`LUAEVENT_STATE_ABORT`) on the thread that updates the state. A reload still marks every pending event `LUAEVENT_STATE_ERASE` (its references belong to the closed state), now also those of processors replaced by 0001 and waiting for the next cleanup, which are not in the processor list; otherwise that cleanup would unreference the old state's reference numbers in the new state. |
 - The backend is `ELUNA_VMANGOS` with `ELUNA_EXPANSION=0`.
 - Lua (5.2 by default; `ELUNA_LUA_VERSION` takes lua51..lua54) is downloaded
   from lua.org at configure time with a pinned SHA-256 and linked statically.
@@ -188,8 +188,9 @@ destroyed, after its objects are unloaded.
   unloads, refusal of objects of another map, instance data across a restart,
   `.reload eluna` while instances open, `CREATURE_EVENT_ON_HIT_BY_SPELL` and
   `GAMEOBJECT_EVENT_ON_SPAWN` (on spawn and respawn), Lua references of
-  despawned creatures returning to zero, and a timer registered in a
-  gameobject's spawn event. The header says what to do and what to expect.
+  despawned creatures returning to zero, a timer registered in a
+  gameobject's spawn event, and a check that every hook of the file is still
+  in its state's registry after reloads. The header says what to do and what to expect.
 
 ## Known limits
 

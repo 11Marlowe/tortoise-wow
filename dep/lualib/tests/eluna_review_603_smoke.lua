@@ -51,11 +51,13 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      despawns them after 3 s. A timer holds its Lua function in the state's
      registry (luaL_ref). The script counts its own timer functions still in
      the registry (debug.getregistry) at the start of the next round.
-     Expect "6 baseline", then per round "6 round R refs freed: 0 of N" and
-     "6 stale handle refused" (a creature kept in a Lua variable is an
-     invalid object, not a pointer). Before dep/eluna-patches/0006 the count
-     grows by N each round: "6 FAIL round R: K timer functions ... still in
-     the registry".
+     Expect "6 baseline", then per round "6 round R refs freed: 0 of N"
+     with N > 0. A round in which no timer could be registered is a FAIL
+     (nothing was tested). Before dep/eluna-patches/0006 the count grows by
+     N each round: "6 FAIL round R: K timer functions ... still in the
+     registry". The "6 stale handle refused" line is information only: in
+     this core a userdata is invalid as soon as the call that pushed it
+     returns, despawned or not, so it does not test the despawn.
 
   7  timer registered in GAMEOBJECT_EVENT_ON_SPAWN
      Each item 6 round also summons gameobject SMOKE_GO_ENTRY next to the
@@ -64,6 +66,27 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      in spawn of gameobject" and then "7 timer from spawn fired". Before the
      spawn event was moved into GameObject::AddToWorld it fired before the
      object was in the world: "7 FAIL RegisterEvent in spawn returned nil".
+
+  8  hooks survive a reload (no old reference freed in the new state)
+     Every hook function this file registers (Register*Event) is held by
+     the state's registry. 5 s after the file is loaded, and every 30 s,
+     each state checks that every one of them is still there:
+     "8 hooks intact: N of N". Run it together with item 4 (reloads) and
+     item 1 (players changing maps). A reference of the closed state
+     unreferenced in the new one frees a slot of the new state, often one
+     of these hooks: "8 FAIL hooks missing from the registry".
+     What it guards: patch 0001 parks a processor that is replaced for the
+     same object (it left the state and came back before the next cleanup)
+     until that cleanup; patch 0006 has a reload mark the parked processor's
+     events ERASE as well, or the cleanup after the reload would unref the
+     closed state's reference numbers in the new state. This cannot be
+     forced from Lua: the parked processor needs an object of the same guid
+     to leave the state and register a timer in it again between two
+     cleanups (one update of the state), and no Lua method removes an
+     object and brings it back with its guid (players relog or teleport
+     over several updates; GameObject:RemoveFromWorld deletes it; creature
+     despawn keeps it in the map). So item 8 detects the damage when the
+     timing happens, it does not make it happen.
 ]]
 
 local SMOKE_INSTANCE_MAP = 34       -- The Stockade: no C++ instance script in src/scripts (nor Ragefire Chasm, 389)
@@ -84,6 +107,26 @@ local INSTANCE_EVENT_ON_PLAYER_ENTER = 4
 local CREATURE_EVENT_ON_HIT_BY_SPELL = 14
 local GAMEOBJECT_EVENT_ON_SPAWN = 2
 local TEMPSUMMON_TIMED_DESPAWN = 3
+
+-- 8: every hook function registered through these globals is counted; a
+-- weak-keyed set, so it never keeps a function alive itself.
+local hookFns = setmetatable({}, { __mode = "k" })
+local hookCount = 0
+for _, name in ipairs({ "RegisterPlayerEvent", "RegisterServerEvent", "RegisterMapEvent",
+        "RegisterCreatureEvent", "RegisterGameObjectEvent" }) do
+    local register = _G[name]
+    _G[name] = function(...)
+        local args = { ... }
+        local result = register(...)
+        for i = 1, select("#", ...) do
+            if type(args[i]) == "function" then
+                hookFns[args[i]] = true
+                hookCount = hookCount + 1
+            end
+        end
+        return result
+    end
+end
 
 local state = "world"
 local stateMapId = -1
@@ -220,11 +263,14 @@ local function startRefLoop(player)
     refLoopStarted = true
     local round = 0
     local spawned = 0
+    local roundSpawned = 0
     local staleHandle = nil
     player:RegisterEvent(function(eventId, delay, repeats, obj)
         local held, functions = countRefTimers()
         if round == 0 then
             log("6", "baseline: " .. held .. " item 6 timer functions, " .. functions .. " functions in the registry")
+        elseif roundSpawned == 0 then
+            log("6", "FAIL round " .. round .. ": no creature timer could be registered, nothing was tested")
         elseif held == 0 then
             log("6", "round " .. round .. " refs freed: 0 of " .. spawned .. " (" .. functions .. " functions in the registry)")
         else
@@ -236,7 +282,7 @@ local function startRefLoop(player)
             if ok then
                 log("6", "FAIL a creature kept from round " .. round .. " is still usable")
             else
-                log("6", "stale handle refused: " .. tostring(err))
+                log("6", "stale handle refused (info only): " .. tostring(err))
             end
             staleHandle = nil
         end
@@ -244,6 +290,7 @@ local function startRefLoop(player)
             return
         end
         round = round + 1
+        roundSpawned = 0
         local x, y, z, o = obj:GetLocation()
         for i = 1, SMOKE_REF_OBJECTS do
             local angle = i * 2 * math.pi / SMOKE_REF_OBJECTS
@@ -257,6 +304,7 @@ local function startRefLoop(player)
                 if creature:RegisterEvent(timer, 600000, 0) then
                     refTimers[timer] = true
                     spawned = spawned + 1
+                    roundSpawned = roundSpawned + 1
                 end
                 staleHandle = creature
             end
@@ -283,3 +331,23 @@ RegisterGameObjectEvent(SMOKE_GO_ENTRY, GAMEOBJECT_EVENT_ON_SPAWN, function(even
         log("7", "FAIL RegisterEvent in spawn returned nil for gameobject " .. name .. " (not in the world yet)")
     end
 end)
+
+-- 8: every hook function of this file is still in the registry.
+local function checkHooks()
+    local present = 0
+    for _, value in pairs(debug.getregistry()) do
+        if type(value) == "function" and hookFns[value] then
+            present = present + 1
+        end
+    end
+    if present == hookCount then
+        log("8", "hooks intact: " .. present .. " of " .. hookCount)
+    else
+        log("8", "FAIL hooks missing from the registry: " .. present .. " of " .. hookCount)
+    end
+end
+
+CreateLuaEvent(function()
+    checkHooks()
+    CreateLuaEvent(checkHooks, 30000, 0)
+end, 5000, 1)
