@@ -38,9 +38,9 @@ cmake --build build --target mangosd
   or is missing (after a submodule bump, refresh the patches); the checks run
   on every configure and remake a copy that fails them.
   `src/game/ElunaScriptBridge.cpp` also fails to compile (`#error`) without
-  the five markers. The copy is remade when a submodule file, a patch or
+  the six markers. The copy is remade when a submodule file, a patch or
   `ElunaSources.cmake` changes. Each patch names its Eluna base commit; 0001,
-  0003, 0004 and 0005 are candidates to upstream to Eluna, 0002 is
+  0003, 0004, 0005 and 0006 are candidates to upstream to Eluna, 0002 is
   VMaNGOS-specific (other cores get the check from trackable pointers).
 
   | Patch | Fixes |
@@ -50,6 +50,7 @@ cmake --build build --target mangosd
   | `0003-vmangos-instance-data-...` | `Save`, `GetData` and `GetData64` of a Lua instance script did not override this core's non-const `InstanceData` methods: instance data was saved empty and lost at a restart, and C++ callers read 0. |
   | `0004-vmangos-creature-spellhit-...` | `CREATURE_EVENT_ON_HIT_BY_SPELL` never fired: the Lua AI's `SpellHit` did not override this core's `CreatureAI::SpellHit(WorldObject*, ...)`. |
   | `0005-template-name-and-decoding-table-...` | Data race: every Lua state stored the per-type `ElunaTemplate<T>::tname` (one static per type for the whole process) in `Register`, so map states made or reloaded on different map threads wrote it at once while other states read it in `Push`/`Check`; also the lazy build of the base-64 table used for instance data. Both are now set once (`std::call_once`, a function-local static). |
+  | `0006-eventmgr-free-lua-references-...` | Lua function references of timers leaked: when an object left its map or was destroyed with a timer pending, its event processor was removed with the events set to `LUAEVENT_STATE_ERASE`, which skips `luaL_unref` (meant for a closed or reloaded state). Each such timer's function, and what its upvalues reach, stayed in the state's registry until the state closed. They are now unreferenced (`LUAEVENT_STATE_ABORT`) on the thread that updates the state. |
 - The backend is `ELUNA_VMANGOS` with `ELUNA_EXPANSION=0`.
 - Lua (5.2 by default; `ELUNA_LUA_VERSION` takes lua51..lua54) is downloaded
   from lua.org at configure time with a pinned SHA-256 and linked statically.
@@ -132,7 +133,14 @@ What the core does to keep to that, only while `Eluna.Enabled = 1`:
   that owns that map, so a timer never runs for a player on another map and an
   instance can be unloaded while a player who was in it is elsewhere. World
   state events of an object destroyed on a map thread are dropped on the world
-  thread before the world state's timers run. Ships and zeppelins
+  thread before the world state's timers run. The Lua function of each
+  pending timer is freed then as well (`dep/eluna-patches/0006`). A script
+  that kept the object in a Lua variable gets an invalid object from it
+  ("pointer to nonexisting (invalidated) object"), never the C++ pointer:
+  in this core a userdata is only valid during the call that pushed it.
+  `GAMEOBJECT_EVENT_ON_SPAWN` fires once the gameobject is in the world (in
+  `GameObject::AddToWorld` after `Create`, and on respawn), so a timer can
+  be registered in it. Ships and zeppelins
   (`MO_TRANSPORT`) cannot have map events (`RegisterEvent` returns nil): they
   move between the maps of a continent.
 
@@ -179,8 +187,9 @@ destroyed, after its objects are unloaded.
   the fixes after the #603 review: player timers across teleports and instance
   unloads, refusal of objects of another map, instance data across a restart,
   `.reload eluna` while instances open, `CREATURE_EVENT_ON_HIT_BY_SPELL` and
-  `GAMEOBJECT_EVENT_ON_SPAWN` (on spawn and respawn). The header says what to
-  do and what to expect.
+  `GAMEOBJECT_EVENT_ON_SPAWN` (on spawn and respawn), Lua references of
+  despawned creatures returning to zero, and a timer registered in a
+  gameobject's spawn event. The header says what to do and what to expect.
 
 ## Known limits
 

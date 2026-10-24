@@ -186,6 +186,16 @@ void GameObject::AddToWorld()
         {
             script->OnGameObjectAddWorld(this);
         });
+
+    // The spawn event of a new object (Create), now that it is in the world
+    // and on its map: obj:RegisterEvent in it needs both. A respawn fires it
+    // from Update.
+    if (m_elunaSpawnPending && IsInWorld())
+    {
+        m_elunaSpawnPending = false;
+        if (Eluna* e = GetMap()->GetEluna())
+            e->OnSpawn(this);
+    }
 #endif
 
     if (CanOnlyBeLootedByPlayersOnMapAtSpawn(GetEntry()))
@@ -321,10 +331,9 @@ bool GameObject::Create(uint32 guidlow, uint32 name_id, Map *map, float x, float
         m_zoneScript->OnObjectCreate(this);
 
 #ifdef ENABLE_ELUNA
-    // Not GetEluna(): that is the state of the map the object is in, and the
-    // object is only added to the map after Create.
-    if (Eluna* e = map->GetEluna())
-        e->OnSpawn(this);
+    // GAMEOBJECT_EVENT_ON_SPAWN fires in AddToWorld: the object is only added
+    // to the map after Create, and a timer cannot be registered before that.
+    m_elunaSpawnPending = true;
 #endif
     return true;
 }

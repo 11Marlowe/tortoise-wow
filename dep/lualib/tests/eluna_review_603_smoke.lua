@@ -43,12 +43,36 @@ a line with "FAIL" is a failed check. What to do and what to expect, per item:
      AI with CREATURE_EVENT_ON_HIT_BY_SPELL). Expect "5 creature hit by spell
      <id>". Let gameobject SMOKE_GO_ENTRY spawn or respawn (a grid loading,
      or loot a herb and wait for its respawn): expect "5 gameobject spawn".
+
+  6  Lua references of objects that are gone
+     Log in and stay put for SMOKE_REF_ROUNDS * 15 s (about a minute). The
+     map state spawns SMOKE_REF_OBJECTS creatures (SMOKE_REF_CREATURE_ENTRY)
+     around the player every 15 s, each with a 10-minute repeating timer, and
+     despawns them after 3 s. A timer holds its Lua function in the state's
+     registry (luaL_ref). The script counts its own timer functions still in
+     the registry (debug.getregistry) at the start of the next round.
+     Expect "6 baseline", then per round "6 round R refs freed: 0 of N" and
+     "6 stale handle refused" (a creature kept in a Lua variable is an
+     invalid object, not a pointer). Before dep/eluna-patches/0006 the count
+     grows by N each round: "6 FAIL round R: K timer functions ... still in
+     the registry".
+
+  7  timer registered in GAMEOBJECT_EVENT_ON_SPAWN
+     Each item 6 round also summons gameobject SMOKE_GO_ENTRY next to the
+     player, and every grid load or respawn of that entry spawns one. Its
+     spawn handler registers a 1 s timer on it. Expect "7 registered timer
+     in spawn of gameobject" and then "7 timer from spawn fired". Before the
+     spawn event was moved into GameObject::AddToWorld it fired before the
+     object was in the world: "7 FAIL RegisterEvent in spawn returned nil".
 ]]
 
 local SMOKE_INSTANCE_MAP = 34       -- The Stockade: no C++ instance script in src/scripts (nor Ragefire Chasm, 389)
 local SMOKE_CREATURE_ENTRY = 6      -- Kobold Vermin, Northshire
 local SMOKE_GO_ENTRY = 1618         -- Peacebloom
 local SMOKE_RELOAD_EVERY_MS = 0     -- > 0: the world state reloads Eluna this often
+local SMOKE_REF_CREATURE_ENTRY = 721 -- Rabbit: item 6 spawns these and lets them despawn
+local SMOKE_REF_OBJECTS = 25        -- creatures per item 6 round
+local SMOKE_REF_ROUNDS = 4          -- item 6 rounds, 15 s apart
 
 local PLAYER_EVENT_ON_LOGIN = 3
 local PLAYER_EVENT_ON_MAP_CHANGE = 28
@@ -59,6 +83,7 @@ local INSTANCE_EVENT_ON_LOAD = 2
 local INSTANCE_EVENT_ON_PLAYER_ENTER = 4
 local CREATURE_EVENT_ON_HIT_BY_SPELL = 14
 local GAMEOBJECT_EVENT_ON_SPAWN = 2
+local TEMPSUMMON_TIMED_DESPAWN = 3
 
 local state = "world"
 local stateMapId = -1
@@ -167,4 +192,94 @@ end)
 
 RegisterGameObjectEvent(SMOKE_GO_ENTRY, GAMEOBJECT_EVENT_ON_SPAWN, function(event, go)
     log("5", "gameobject spawn " .. go:GetEntry())
+end)
+
+-- 6: timers of objects that are gone free their Lua references. The timer
+-- functions are kept as weak keys, so this table never keeps one alive; one
+-- found in the registry is held by the registry alone.
+local refTimers = setmetatable({}, { __mode = "k" })
+local refLoopStarted = false
+
+local function countRefTimers()
+    local held, functions = 0, 0
+    for _, value in pairs(debug.getregistry()) do
+        if type(value) == "function" then
+            functions = functions + 1
+            if refTimers[value] then
+                held = held + 1
+            end
+        end
+    end
+    return held, functions
+end
+
+local function startRefLoop(player)
+    if refLoopStarted then
+        return
+    end
+    refLoopStarted = true
+    local round = 0
+    local spawned = 0
+    local staleHandle = nil
+    player:RegisterEvent(function(eventId, delay, repeats, obj)
+        local held, functions = countRefTimers()
+        if round == 0 then
+            log("6", "baseline: " .. held .. " item 6 timer functions, " .. functions .. " functions in the registry")
+        elseif held == 0 then
+            log("6", "round " .. round .. " refs freed: 0 of " .. spawned .. " (" .. functions .. " functions in the registry)")
+        else
+            log("6", "FAIL round " .. round .. ": " .. held .. " timer functions of " .. spawned ..
+                " despawned creatures still in the registry (" .. functions .. " functions in the registry)")
+        end
+        if staleHandle then
+            local ok, err = pcall(function() return staleHandle:GetEntry() end)
+            if ok then
+                log("6", "FAIL a creature kept from round " .. round .. " is still usable")
+            else
+                log("6", "stale handle refused: " .. tostring(err))
+            end
+            staleHandle = nil
+        end
+        if round >= SMOKE_REF_ROUNDS then
+            return
+        end
+        round = round + 1
+        local x, y, z, o = obj:GetLocation()
+        for i = 1, SMOKE_REF_OBJECTS do
+            local angle = i * 2 * math.pi / SMOKE_REF_OBJECTS
+            local creature = obj:SpawnCreature(SMOKE_REF_CREATURE_ENTRY, x + 6 * math.cos(angle), y + 6 * math.sin(angle), z, o,
+                TEMPSUMMON_TIMED_DESPAWN, 3000)
+            if creature then
+                -- An upvalue per timer: Lua 5.2 may reuse one closure for
+                -- a function without upvalues.
+                local tag = round * 1000 + i
+                local timer = function() return tag end
+                if creature:RegisterEvent(timer, 600000, 0) then
+                    refTimers[timer] = true
+                    spawned = spawned + 1
+                end
+                staleHandle = creature
+            end
+        end
+        -- 7: a summoned gameobject goes through Create and Map::Add.
+        obj:SummonGameObject(SMOKE_GO_ENTRY, x + 3, y, z, o, 10)
+        log("6", "round " .. round .. " spawned " .. SMOKE_REF_OBJECTS .. " creatures, " .. spawned .. " timers so far")
+    end, 15000, SMOKE_REF_ROUNDS + 1)
+end
+
+RegisterPlayerEvent(PLAYER_EVENT_ON_LOGIN, function(event, player)
+    startRefLoop(player)
+end)
+
+-- 7: a timer registered in the spawn event runs.
+RegisterGameObjectEvent(SMOKE_GO_ENTRY, GAMEOBJECT_EVENT_ON_SPAWN, function(event, go)
+    local name = go:GetEntry() .. "/" .. go:GetGUIDLow()
+    local eventId = go:RegisterEvent(function(id, delay, repeats, obj)
+        log("7", "timer from spawn fired on gameobject " .. name)
+    end, 1000, 1)
+    if eventId then
+        log("7", "registered timer in spawn of gameobject " .. name)
+    else
+        log("7", "FAIL RegisterEvent in spawn returned nil for gameobject " .. name .. " (not in the world yet)")
+    end
 end)
