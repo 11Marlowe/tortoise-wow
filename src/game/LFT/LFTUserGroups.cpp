@@ -392,7 +392,7 @@ void LFTManager::HandleManualRolecheckResponse(Player* player, std::vector<std::
 }
 
 bool LFTManager::CreateGroupListing(Player* leader, std::string const& title, std::string const& description,
-                                     uint8 category, std::array<uint8, 3> const& limits)
+                                     uint8 category, std::array<uint8, 3> const& limits, uint32* outListingId)
 {
     EnsureListingsLoaded();
 
@@ -427,19 +427,23 @@ bool LFTManager::CreateGroupListing(Player* leader, std::string const& title, st
         return false;
     for (char c : title)
     {
-        if (c == ';' || static_cast<unsigned char>(c) < 0x20)
+        unsigned char uc = static_cast<unsigned char>(c);
+        if (c == ';' || uc < 0x20 || uc == 0x7F)
             return false;
     }
     for (char c : description)
     {
-        if (c == ';' || static_cast<unsigned char>(c) < 0x20)
+        unsigned char uc = static_cast<unsigned char>(c);
+        if (c == ';' || uc < 0x20 || uc == 0x7F)
             return false;
     }
     std::wstring wide;
     if (!Utf8toWStr(title, wide) || !Utf8toWStr(description, wide))
         return false;
 
-    CreateListing(leader, title, description, category, limits);
+    uint32 listingId = CreateListing(leader, title, description, category, limits);
+    if (outListingId)
+        *outListingId = listingId;
     return true;
 }
 
@@ -521,9 +525,14 @@ bool LFTManager::DeclineListingSignup(Player* leader, ObjectGuid const& memberGu
     if (!IsListingLeader(leader))
         return false;
 
-    std::string name;
-    if (!sObjectMgr.GetPlayerNameByGUID(memberGuid, name))
+    Player* member = GetPlayer(memberGuid);
+    if (!member || (member != leader && (!leader->GetGroup() || !leader->GetGroup()->IsMember(memberGuid))))
         return false;
+
+    if (!sScriptMgr.IsBotManaged(member))
+        return false;
+
+    std::string name = member->GetName();
 
     std::string normalized = name;
     if (!normalizePlayerName(normalized))
@@ -547,7 +556,7 @@ bool LFTManager::DeclineListingSignup(Player* leader, ObjectGuid const& memberGu
     if (!found)
         return false;
 
-    ApplyListingSignup(*listing, name, GetPlayer(memberGuid), 0);
+    ApplyListingSignup(*listing, name, member, 0);
     return true;
 }
 

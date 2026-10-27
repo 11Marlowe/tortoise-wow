@@ -90,8 +90,9 @@ class LFTManager
         // Lists the leader's group in the group finder (as C2S_NEW_GROUP). Fails if the
         // leader already has a listing (RemoveGroupListing first). limits = tank, healer,
         // damage wanted; all zero = no roles. category 1-4 as the addon's browse tabs.
+        // outListingId, if given, receives the new listing's id, set only on success.
         bool CreateGroupListing(Player* leader, std::string const& title, std::string const& description,
-                                uint8 category, std::array<uint8, 3> const& limits);
+                                uint8 category, std::array<uint8, 3> const& limits, uint32* outListingId = nullptr);
         // Removes the leader's listing (as C2S_DELETE_GROUP). False if it has none.
         bool RemoveGroupListing(Player* leader);
         // Sets a managed party member's role row on the leader's listing (as that member's
@@ -99,7 +100,11 @@ class LFTManager
         // Never invites anybody: the member must already be the leader or in the leader's group.
         bool AcceptListingSignup(Player* leader, ObjectGuid const& memberGuid, uint8 role);
         // Clears an existing role row on the leader's listing (as C2C_ROLECHECK_RESPONSE;0).
-        // False if the listing has no row for that member.
+        // Only a module-managed member of the leader's party: the member must resolve as a
+        // live Player (in world), be the leader or in the leader's group, and be bot-managed;
+        // a human's row is changed only by their own client. False if the checks fail or the
+        // listing has no row for that member. Stale rows of departed players stay the job of
+        // the PruneListingSignups path.
         bool DeclineListingSignup(Player* leader, ObjectGuid const& memberGuid);
 
         struct ListingSignupInfo
